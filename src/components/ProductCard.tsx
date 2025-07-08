@@ -64,13 +64,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageContainer}>
         <Image source={{ uri: product.image }} style={styles.image} />
-        {product.originalPrice && (
+        {product.originalPrice && Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) > 0 && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>
               {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
             </Text>
           </View>
         )}
+        
+        {/* In Stock Indicator */}
+        {product.inStock && (
+          <View style={styles.inStockBadge}>
+            <Ionicons name="checkmark-circle" size={12} color={theme.colors.success[600]} />
+            <Text style={styles.inStockText}>In Stock</Text>
+          </View>
+        )}
+        
         {!product.inStock && (
           <View style={styles.outOfStockOverlay}>
             <Text style={styles.outOfStockText}>Out of Stock</Text>
@@ -79,25 +88,43 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </View>
 
       <View style={styles.content}>
-        <View style={styles.brandContainer}>
-          <Text style={styles.brand}>{product.brand}</Text>
-          <Text style={styles.category}>{product.category}</Text>
+        {/* Brand and Category Row */}
+        <View style={styles.brandCategoryRow}>
+          <View style={styles.brandBadge}>
+            <Text style={styles.brandText}>{product.brand}</Text>
+          </View>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{product.category}</Text>
+          </View>
         </View>
 
+        {/* Product Name */}
         <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
 
-        <View style={styles.ratingContainer}>
-          <Text style={styles.stars}>{renderStars(product.rating)}</Text>
-          <Text style={styles.rating}>{product.rating}</Text>
-          <Text style={styles.reviews}>({product.reviewCount})</Text>
+        {/* Rating and Reviews */}
+        <View style={styles.ratingSection}>
+          <View style={styles.starsContainer}>
+            <Text style={styles.stars}>{renderStars(product.rating)}</Text>
+            <Text style={styles.ratingValue}>{product.rating}</Text>
+          </View>
+          <Text style={styles.reviewCount}>({product.reviewCount} reviews)</Text>
         </View>
 
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>${product.price}</Text>
-          {product.originalPrice && (
-            <Text style={styles.originalPrice}>${product.originalPrice}</Text>
+        {/* Price Section */}
+        <View style={styles.priceSection}>
+          <View style={styles.currentPriceContainer}>
+            <Text style={styles.currencySymbol}>$</Text>
+            <Text style={styles.price}>{product.price}</Text>
+          </View>
+          {product.originalPrice && (product.originalPrice - product.price) > 0 && (
+            <View style={styles.originalPriceContainer}>
+              <Text style={styles.originalPrice}>${product.originalPrice}</Text>
+              <Text style={styles.savings}>
+                Save ${(product.originalPrice - product.price).toFixed(2)}
+              </Text>
+            </View>
           )}
         </View>
 
@@ -120,7 +147,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 onPress={handleAddToCart}
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={18} color={theme.colors.background} />
+                <Ionicons name="cart-outline" size={18} color={theme.colors.background} />
                 <Text style={styles.addToCartText}>Add to Cart</Text>
               </TouchableOpacity>
             ) : (
@@ -164,15 +191,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius['2xl'],
     marginBottom: theme.spacing.lg,
     marginHorizontal: theme.spacing.xs,
-    overflow: 'hidden',
     ...theme.shadows.md,
-    flex: 1,
-    minWidth: 0,
   },
   imageContainer: {
     position: 'relative',
     width: '100%',
     height: 220,
+    overflow: 'hidden',
+    borderTopLeftRadius: theme.borderRadius['2xl'],
+    borderTopRightRadius: theme.borderRadius['2xl'],
   },
   image: {
     width: '100%',
@@ -183,15 +210,50 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: theme.spacing.md,
     right: theme.spacing.md,
-    backgroundColor: theme.colors.error[500],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.error[600],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderTopLeftRadius: theme.borderRadius.md,
+    borderBottomLeftRadius: theme.borderRadius.md,
+    borderTopRightRadius: theme.borderRadius.sm,
+    borderBottomRightRadius: theme.borderRadius.sm,
+    ...theme.shadows.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+    transform: [{ rotate: '-8deg' }],
+    // Tag-like design with notch effect
+    shadowColor: theme.colors.error[800],
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 6,
   },
   discountText: {
     color: theme.colors.text.inverse,
     fontSize: theme.typography.sizes.xs,
-    fontWeight: '700' as any,
+    fontWeight: '800' as any,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: theme.typography.letterSpacing.wide,
+  },
+  inStockBadge: {
+    position: 'absolute',
+    top: theme.spacing.md,
+    left: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.success[50],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success[200],
+  },
+  inStockText: {
+    color: theme.colors.success[700],
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600' as any,
+    marginLeft: theme.spacing.xs,
   },
   outOfStockOverlay: {
     position: 'absolute',
@@ -210,68 +272,124 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.lg,
+    borderBottomLeftRadius: theme.borderRadius['2xl'],
+    borderBottomRightRadius: theme.borderRadius['2xl'],
+    backgroundColor: theme.colors.background,
   },
-  brandContainer: {
+  brandCategoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
-  brand: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: '600' as any,
-    color: theme.colors.primary[600],
+  brandBadge: {
+    backgroundColor: theme.colors.primary[600],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    ...theme.shadows.md,
+    elevation: 3,
+  },
+  brandText: {
+    fontSize: 12,
+    fontWeight: '800' as any,
+    color: theme.colors.text.inverse,
     textTransform: 'uppercase',
-    letterSpacing: theme.typography.letterSpacing.wide,
+    letterSpacing: 0.5,
   },
-  category: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.tertiary,
-    fontWeight: '500' as any,
+  categoryBadge: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[200],
+    ...theme.shadows.sm,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: theme.colors.primary[700],
+    fontWeight: '700' as any,
+    textTransform: 'capitalize',
   },
   name: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: 20,
     fontWeight: '700' as any,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
-    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.lg,
+    lineHeight: 22,
   },
-  ratingContainer: {
+  ratingSection: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[50],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[200],
   },
   stars: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.warning[400],
+    color: theme.colors.warning[500],
     marginRight: theme.spacing.xs,
   },
-  rating: {
+  ratingValue: {
     fontSize: theme.typography.sizes.sm,
-    fontWeight: '600' as any,
-    color: theme.colors.text.primary,
-    marginRight: theme.spacing.xs,
+    fontWeight: '700' as any,
+    color: theme.colors.warning[700],
   },
-  reviews: {
+  reviewCount: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
+    fontWeight: '500' as any,
+    fontStyle: 'italic',
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  priceSection: {
     marginBottom: theme.spacing.md,
   },
+  currentPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: theme.spacing.xs,
+  },
+  currencySymbol: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600' as any,
+    color: theme.colors.text.primary,
+    marginRight: 2,
+  },
   price: {
-    fontSize: theme.typography.sizes['2xl'],
+    fontSize: theme.typography.sizes.xl,
     fontWeight: '800' as any,
-    color: theme.colors.success[600],
-    marginRight: theme.spacing.md,
+    color: theme.colors.text.primary,
+  },
+  originalPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   originalPrice: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.tertiary,
     textDecorationLine: 'line-through',
     fontWeight: '500' as any,
+  },
+  savings: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.success[700],
+    fontWeight: '600' as any,
+    backgroundColor: theme.colors.success[50],
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -286,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   tagText: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.primary[700],
     fontWeight: '600' as any,
   },

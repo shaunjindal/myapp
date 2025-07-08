@@ -254,7 +254,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
     return products.find(product => product.id === id);
   },
 
+  // Deprecated: Use recommendationService.getRecommendationsForProduct instead
   getRecommendedProducts: (currentProductId: string, limit: number = 6) => {
+    console.warn('getRecommendedProducts is deprecated. Use recommendationService.getRecommendationsForProduct instead.');
     const { products } = get();
     const currentProduct = products.find(p => p.id === currentProductId);
     

@@ -82,7 +82,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/cart/**",
                     "/api/products/**",
-                    "/api/categories/**"
+                    "/api/categories/**",
+                    "/api/recommendations/**"
                 ).permitAll()
                 
                 // Require authentication for all other API endpoints

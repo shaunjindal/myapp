@@ -391,7 +391,7 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public Page<ProductJpaEntity> getAvailableProducts(Pageable pageable) {
-        return productRepository.findAvailableProducts(pageable);
+        return productRepository.findAvailableProducts(ProductStatus.ACTIVE, pageable);
     }
 
     /**
@@ -399,7 +399,7 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<ProductJpaEntity> getProductsNeedingRestock(int threshold) {
-        return productRepository.findProductsNeedingRestock(threshold);
+        return productRepository.findProductsNeedingRestock(ProductStatus.ACTIVE, threshold);
     }
 
     /**
@@ -407,7 +407,7 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<ProductJpaEntity> getLowStockAlerts() {
-        return productRepository.getLowStockAlerts();
+        return productRepository.getLowStockAlerts(ProductStatus.ACTIVE);
     }
 
     // Status management

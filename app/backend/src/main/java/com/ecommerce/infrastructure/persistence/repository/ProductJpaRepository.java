@@ -96,11 +96,11 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
     List<ProductJpaEntity> findOverstockedProducts(@Param("status") ProductStatus status);
     
     // Find available products (in stock and active)
-    @Query("SELECT p FROM ProductJpaEntity p WHERE (p.stockQuantity - p.reservedQuantity) > 0 AND p.status = 'ACTIVE'")
-    List<ProductJpaEntity> findAvailableProducts();
+    @Query("SELECT p FROM ProductJpaEntity p WHERE (p.stockQuantity - p.reservedQuantity) > 0 AND p.status = :status")
+    List<ProductJpaEntity> findAvailableProducts(@Param("status") ProductStatus status);
     
-    @Query("SELECT p FROM ProductJpaEntity p WHERE (p.stockQuantity - p.reservedQuantity) > 0 AND p.status = 'ACTIVE'")
-    Page<ProductJpaEntity> findAvailableProducts(Pageable pageable);
+    @Query("SELECT p FROM ProductJpaEntity p WHERE (p.stockQuantity - p.reservedQuantity) > 0 AND p.status = :status")
+    Page<ProductJpaEntity> findAvailableProducts(@Param("status") ProductStatus status, Pageable pageable);
 
     // Search and filtering queries
     
@@ -271,11 +271,11 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
     @Query("""
         SELECT p FROM ProductJpaEntity p WHERE 
         p.stockQuantity <= p.minStockLevel AND 
-        p.status = 'ACTIVE' AND
+        p.status = :status AND
         (p.stockQuantity - p.reservedQuantity) <= :threshold
         ORDER BY (p.stockQuantity - p.reservedQuantity) ASC
         """)
-    List<ProductJpaEntity> findProductsNeedingRestock(@Param("threshold") int threshold);
+    List<ProductJpaEntity> findProductsNeedingRestock(@Param("status") ProductStatus status, @Param("threshold") int threshold);
     
     /**
      * Get inventory summary by category
@@ -297,10 +297,10 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
     @Query("""
         SELECT p FROM ProductJpaEntity p WHERE 
         p.stockQuantity <= p.minStockLevel AND 
-        p.status = 'ACTIVE'
+        p.status = :status
         ORDER BY (p.stockQuantity - p.minStockLevel) ASC
         """)
-    List<ProductJpaEntity> getLowStockAlerts();
+    List<ProductJpaEntity> getLowStockAlerts(@Param("status") ProductStatus status);
 
     /**
      * Find products by category active status
@@ -317,12 +317,30 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
     /**
      * Find active products from active categories only
      */
-    @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = 'ACTIVE' AND p.category.active = true")
-    Page<ProductJpaEntity> findActiveProductsFromActiveCategories(Pageable pageable);
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = :status AND p.category.active = true")
+    Page<ProductJpaEntity> findActiveProductsFromActiveCategories(@Param("status") ProductStatus status, Pageable pageable);
     
     /**
      * Find products by category ID, only if category is active
      */
     @Query("SELECT p FROM ProductJpaEntity p WHERE p.category.id = :categoryId AND p.category.active = true")
     Page<ProductJpaEntity> findByCategoryIdAndCategoryActive(@Param("categoryId") String categoryId, Pageable pageable);
+    
+    /**
+     * Find products by category ID, status, and stock quantity greater than specified value
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.category.id = :categoryId AND p.status = :status AND p.stockQuantity > :stockQuantity")
+    List<ProductJpaEntity> findByCategory_IdAndStatusAndStockQuantityGreaterThan(@Param("categoryId") String categoryId, @Param("status") ProductStatus status, @Param("stockQuantity") int stockQuantity);
+    
+    /**
+     * Find products by brand, status, and stock quantity greater than specified value
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.brand = :brand AND p.status = :status AND p.stockQuantity > :stockQuantity")
+    List<ProductJpaEntity> findByBrandAndStatusAndStockQuantityGreaterThan(@Param("brand") String brand, @Param("status") ProductStatus status, @Param("stockQuantity") int stockQuantity);
+    
+    /**
+     * Find products by price range, status, and stock quantity greater than specified value
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.price BETWEEN :minPrice AND :maxPrice AND p.status = :status AND p.stockQuantity > :stockQuantity")
+    List<ProductJpaEntity> findByPriceBetweenAndStatusAndStockQuantityGreaterThan(@Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, @Param("status") ProductStatus status, @Param("stockQuantity") int stockQuantity);
 } 

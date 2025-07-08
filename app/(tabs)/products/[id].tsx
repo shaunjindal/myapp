@@ -9,8 +9,10 @@ import { Button } from '../../../src/components/Button';
 import { theme } from '../../../src/styles/theme';
 import { StyleSheet } from 'react-native';
 import { productService } from '../../../src/services/productService';
+import { recommendationService } from '../../../src/services/recommendationService';
 import { mapProductDtoToProduct } from '../../../src/types/api';
 import { Product } from '../../../src/types';
+import { RecommendationSection } from '../../../src/components/RecommendationSection';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -25,6 +27,7 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const carouselRef = useRef<FlatList>(null);
   const indicatorOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<NodeJS.Timeout | null>(null);
@@ -67,6 +70,8 @@ export default function ProductDetailScreen() {
       fetchProduct();
     }
   }, [id]);
+
+
 
   const showIndicators = useCallback(() => {
     setIndicatorsVisible(true);
@@ -119,7 +124,6 @@ export default function ProductDetailScreen() {
   }, [resetHideTimer]);
 
   // Computed values (not hooks)
-  const recommendedProducts = getRecommendedProducts(id as string, 6);
   const cartItem = items.find(item => item.product.id === product?.id);
   const isInCart = !!cartItem;
   const currentQuantity = cartItem?.quantity || 0;
@@ -180,23 +184,7 @@ export default function ProductDetailScreen() {
     index,
   });
 
-  const renderRecommendedProduct = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.recommendedProductCard}
-      onPress={() => router.push(`/(tabs)/products/${item.id}`)}
-    >
-      <Image source={{ uri: item.images[0] }} style={styles.recommendedProductImage} />
-      <View style={styles.recommendedProductInfo}>
-        <Text style={styles.recommendedProductName} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <Text style={styles.recommendedProductPrice}>${item.price}</Text>
-        <View style={styles.recommendedProductRating}>
-          <Text style={styles.recommendedProductRatingText}>⭐ {item.rating}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -264,98 +252,154 @@ export default function ProductDetailScreen() {
 
         {/* Product Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <View style={styles.brandCategoryContainer}>
-            <Text style={styles.brand}>{product.brand}</Text>
-            <Text style={styles.category}>{product.category}</Text>
-          </View>
-          
-          <View style={styles.priceRatingContainer}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>${product.price}</Text>
-              {product.originalPrice && (
-                <Text style={styles.originalPrice}>${product.originalPrice}</Text>
-              )}
+          {/* Brand and Category Row */}
+          <View style={styles.brandCategoryRow}>
+            <View style={styles.brandBadge}>
+              <Text style={styles.brandText}>{product.brand}</Text>
             </View>
-            <View style={styles.ratingContainer}>
-              <Text style={styles.rating}>⭐ {product.rating}</Text>
-              <Text style={styles.reviews}>({product.reviewCount} reviews)</Text>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{product.category}</Text>
             </View>
           </View>
 
-          <Text style={styles.description}>{product.description}</Text>
+          {/* Product Name */}
+          <Text style={styles.productName}>{product.name}</Text>
+
+          {/* Rating and Reviews */}
+          <View style={styles.ratingSection}>
+            <View style={styles.starsContainer}>
+              <Text style={styles.stars}>{'★'.repeat(Math.floor(product.rating)) + '☆'.repeat(5 - Math.floor(product.rating))}</Text>
+              <Text style={styles.ratingValue}>{product.rating}</Text>
+            </View>
+            <Text style={styles.reviewCount}>({product.reviewCount} reviews)</Text>
+          </View>
+
+          {/* Price Section */}
+          <View style={styles.priceSection}>
+            <View style={styles.currentPriceContainer}>
+              <Text style={styles.currencySymbol}>$</Text>
+              <Text style={styles.price}>{product.price}</Text>
+            </View>
+            {product.originalPrice && (product.originalPrice - product.price) > 0 && (
+              <View style={styles.originalPriceContainer}>
+                <Text style={styles.originalPrice}>${product.originalPrice}</Text>
+                <Text style={styles.savings}>
+                  Save ${(product.originalPrice - product.price).toFixed(2)}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Description Section */}
+          <View style={styles.descriptionSection}>
+            <View style={styles.descriptionHeader}>
+              <Text style={styles.descriptionTitle}>Description</Text>
+              <TouchableOpacity 
+                style={styles.expandButton}
+                onPress={() => setDescriptionExpanded(!descriptionExpanded)}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={descriptionExpanded ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={theme.colors.primary[600]} 
+                />
+              </TouchableOpacity>
+            </View>
+            
+            <Text 
+              style={styles.description}
+              numberOfLines={descriptionExpanded ? undefined : 3}
+            >
+              {product.description}
+            </Text>
+            
+            {product.description.length > 150 && !descriptionExpanded && (
+              <TouchableOpacity 
+                style={styles.readMoreButton}
+                onPress={() => setDescriptionExpanded(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.readMoreText}>Read more</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Stock Status */}
-          <View style={[
-            styles.stockContainer,
-            { 
-              backgroundColor: product.inStock ? theme.colors.success[50] : theme.colors.error[50],
-              borderColor: product.inStock ? theme.colors.success[200] : theme.colors.error[200]
-            }
-          ]}>
-            {product.inStock ? (
-              <Text style={[styles.inStock, { color: theme.colors.success[700] }]}>
-                ✓ In Stock ({product.stockQuantity} available)
+          <View style={styles.stockSection}>
+            <View style={styles.stockHeader}>
+              <Text style={styles.stockLabel}>Availability</Text>
+              <View style={[
+                styles.stockStatusDot,
+                { backgroundColor: product.inStock ? theme.colors.success[500] : theme.colors.error[500] }
+              ]} />
+            </View>
+            
+            <View style={styles.stockContent}>
+              <Text style={[
+                styles.stockStatus,
+                { color: product.inStock ? theme.colors.success[700] : theme.colors.error[700] }
+              ]}>
+                {product.inStock ? 'In Stock' : 'Out of Stock'}
               </Text>
-            ) : (
-              <Text style={[styles.outOfStock, { color: theme.colors.error[700] }]}>
-                ✗ Out of Stock
-              </Text>
-            )}
+              
+              {product.inStock && (
+                <Text style={styles.stockQuantity}>
+                  {product.stockQuantity} units available
+                </Text>
+              )}
+            </View>
           </View>
 
         </View>
 
         {/* Specifications */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Specifications</Text>
-          {Object.entries(product.specifications).map(([key, value]) => (
-            <View key={key} style={styles.specificationRow}>
-              <Text style={styles.specificationKey}>{key}:</Text>
-              <Text style={styles.specificationValue}>{String(value)}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Tags */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Tags</Text>
-          <View style={styles.tags}>
-            {product.tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
+        {Object.keys(product.specifications).length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Specifications</Text>
+            {Object.entries(product.specifications).map(([key, value]) => (
+              <View key={key} style={styles.specificationRow}>
+                <Text style={styles.specificationKey}>{key}:</Text>
+                <Text style={styles.specificationValue}>{String(value)}</Text>
               </View>
             ))}
           </View>
-        </View>
+        )}
 
-        {/* Recommended Products */}
-        {recommendedProducts.length > 0 && (
+        {/* Tags */}
+        {product.tags.length > 0 && (
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>You might also like</Text>
-            <FlatList
-              data={recommendedProducts}
-              renderItem={renderRecommendedProduct}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedProducts}
-            />
+            <Text style={styles.sectionTitle}>Tags</Text>
+            <View style={styles.tags}>
+              {product.tags.map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
+
+        {/* Recommended Products */}
+        <RecommendationSection
+          productId={product.id}
+          title="You might also like"
+          limit={6}
+        />
       </ScrollView>
 
       {/* Add to Cart Section */}
       {product.inStock && (
         <View style={styles.cartSection}>
           {!isInCart ? (
-            <Button
-              title="Add to Cart"
+            <TouchableOpacity
+              style={styles.addToCartButton}
               onPress={handleAddToCart}
-              variant="primary"
-              size="lg"
-              fullWidth
-            />
+              activeOpacity={0.8}
+            >
+              <Ionicons name="cart-outline" size={20} color={theme.colors.background} />
+              <Text style={styles.addToCartText}>Add to Cart</Text>
+            </TouchableOpacity>
           ) : (
             <View style={styles.cartControls}>
               <View style={styles.quantityContainer}>
@@ -504,87 +548,202 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.gray[200],
   },
   productName: {
-    fontSize: theme.typography.sizes['2xl'],
+    fontSize: theme.typography.sizes.xl,
     fontWeight: '700',
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.sm,
-    lineHeight: 32,
+    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.xl,
   },
-  brandCategoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  brand: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    marginRight: theme.spacing.md,
-    fontWeight: '600',
-  },
-  category: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    backgroundColor: theme.colors.gray[100],
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-  priceRatingContainer: {
+  brandCategoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing.lg,
   },
-  priceContainer: {
+  brandBadge: {
+    backgroundColor: theme.colors.primary[600],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    ...theme.shadows.md,
+    elevation: 3,
+  },
+  brandText: {
+    fontSize: 12,
+    fontWeight: '800' as any,
+    color: theme.colors.text.inverse,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  categoryBadge: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[200],
+    ...theme.shadows.sm,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: theme.colors.primary[700],
+    fontWeight: '700' as any,
+    textTransform: 'capitalize',
+  },
+  ratingSection: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
   },
-  price: {
-    fontSize: theme.typography.sizes['3xl'],
-    fontWeight: '700',
-    color: theme.colors.primary[600],
-  },
-  originalPrice: {
-    fontSize: theme.typography.sizes.lg,
-    color: theme.colors.text.secondary,
-    textDecorationLine: 'line-through',
-    marginLeft: theme.spacing.md,
-  },
-  ratingContainer: {
+  starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: theme.colors.warning[50],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[200],
   },
-  rating: {
+  stars: {
     fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-    marginRight: theme.spacing.xs,
+    color: theme.colors.warning[500],
+    marginRight: theme.spacing.sm,
   },
-  reviews: {
+  ratingValue: {
     fontSize: theme.typography.sizes.base,
+    fontWeight: '700' as any,
+    color: theme.colors.warning[700],
+  },
+  reviewCount: {
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
+    fontWeight: '500' as any,
+    fontStyle: 'italic',
+  },
+  priceSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  currentPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: theme.spacing.sm,
+  },
+  currencySymbol: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: '600' as any,
+    color: theme.colors.text.primary,
+    marginRight: 4,
+  },
+  price: {
+    fontSize: theme.typography.sizes['2xl'],
+    fontWeight: '800' as any,
+    color: theme.colors.text.primary,
+  },
+  originalPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  originalPrice: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.tertiary,
+    textDecorationLine: 'line-through',
+    fontWeight: '500' as any,
+  },
+  savings: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.success[700],
+    fontWeight: '600' as any,
+    backgroundColor: theme.colors.success[50],
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+  },
+  descriptionSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  descriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  descriptionTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '700' as any,
+    color: theme.colors.text.primary,
+    textTransform: 'uppercase',
+    letterSpacing: theme.typography.letterSpacing.wide,
+  },
+  expandButton: {
+    padding: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary[50],
   },
   description: {
     fontSize: theme.typography.sizes.base,
     color: theme.colors.text.primary,
-    lineHeight: 24,
-    marginBottom: theme.spacing.md,
+    lineHeight: theme.typography.lineHeights.relaxed * theme.typography.sizes.base,
+    marginBottom: theme.spacing.sm,
   },
-  stockContainer: {
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md,
+  readMoreButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.colors.primary[50],
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  readMoreText: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '600' as any,
+    color: theme.colors.primary[700],
+  },
+  stockSection: {
+    marginBottom: theme.spacing.lg,
     marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+    borderBottomColor: theme.colors.gray[200],
   },
-  inStock: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600',
-    textAlign: 'center',
+  stockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.xs,
   },
-  outOfStock: {
+  stockLabel: {
     fontSize: theme.typography.sizes.base,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '600' as any,
+    color: theme.colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: theme.typography.letterSpacing.wide,
+  },
+  stockStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: theme.spacing.sm,
+  },
+  stockContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stockStatus: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '700' as any,
+  },
+  stockQuantity: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '500' as any,
+    color: theme.colors.text.secondary,
   },
   sectionContainer: {
     backgroundColor: theme.colors.surface,
@@ -594,7 +753,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.gray[200],
   },
   sectionTitle: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: theme.typography.sizes.xl,
     fontWeight: '700',
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
@@ -623,63 +782,141 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    backgroundColor: theme.colors.gray[100],
-    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.primary[100],
+    paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.full,
-    marginRight: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
+    marginRight: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
   tagText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.primary,
-    fontWeight: '500',
+    color: theme.colors.primary[700],
+    fontWeight: '600' as any,
   },
   recommendedProducts: {
     paddingLeft: theme.spacing.xl,
   },
   recommendedProductCard: {
-    width: 140,
+    width: 160,
     backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.gray[200],
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius['2xl'],
     marginRight: theme.spacing.md,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.md,
+  },
+  recommendedImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 120,
+    overflow: 'hidden',
+    borderTopLeftRadius: theme.borderRadius['2xl'],
+    borderTopRightRadius: theme.borderRadius['2xl'],
   },
   recommendedProductImage: {
     width: '100%',
-    height: 100,
+    height: '100%',
     resizeMode: 'cover',
+  },
+  recommendedDiscountBadge: {
+    position: 'absolute',
+    top: theme.spacing.xs,
+    right: theme.spacing.xs,
+    backgroundColor: theme.colors.error[600],
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    ...theme.shadows.sm,
+  },
+  recommendedDiscountText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '700' as any,
+    textTransform: 'uppercase',
   },
   recommendedProductInfo: {
     padding: theme.spacing.md,
   },
+  recommendedBrandCategoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  recommendedBrandBadge: {
+    backgroundColor: theme.colors.primary[600],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+    marginBottom: theme.spacing.xs,
+    alignSelf: 'flex-start',
+    ...theme.shadows.sm,
+    elevation: 2,
+  },
+  recommendedCategoryBadge: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+    ...theme.shadows.sm,
+  },
+  recommendedCategoryText: {
+    fontSize: 9,
+    color: theme.colors.primary[700],
+    fontWeight: '700' as any,
+    textTransform: 'capitalize',
+  },
+  recommendedBrandText: {
+    fontSize: 10,
+    fontWeight: '800' as any,
+    color: theme.colors.text.inverse,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   recommendedProductName: {
     fontSize: theme.typography.sizes.sm,
-    fontWeight: '600',
+    fontWeight: '700' as any,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
-    height: 32,
+    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.sm,
   },
-  recommendedProductPrice: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600',
-    color: theme.colors.primary[600],
-    marginBottom: theme.spacing.xs,
-  },
-  recommendedProductRating: {
+  recommendedRatingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: theme.colors.warning[50],
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.xs,
+    alignSelf: 'flex-start',
   },
-  recommendedProductRatingText: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
+  recommendedStars: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.warning[500],
+    marginRight: 2,
+  },
+  recommendedRatingValue: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '700' as any,
+    color: theme.colors.warning[700],
+  },
+  recommendedPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  recommendedPrice: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '800' as any,
+    color: theme.colors.text.primary,
+  },
+  recommendedOriginalPrice: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.tertiary,
+    textDecorationLine: 'line-through',
+    fontWeight: '500' as any,
   },
   cartSection: {
     backgroundColor: theme.colors.surface,
@@ -691,6 +928,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 8,
+  },
+  addToCartButton: {
+    backgroundColor: theme.colors.primary[600],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.md,
+  },
+  addToCartText: {
+    color: theme.colors.background,
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600' as any,
+    marginLeft: theme.spacing.sm,
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -744,5 +997,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.error[600],
     marginLeft: theme.spacing.sm,
+  },
+  recommendationsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  recommendationsLoadingText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    marginLeft: theme.spacing.md,
+  },
+  noRecommendationsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  noRecommendationsText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    fontStyle: 'italic',
   },
 }); 
