@@ -238,6 +238,25 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
     int updateStatusByCategory(@Param("categoryId") String categoryId, @Param("status") ProductStatus status);
     
     /**
+     * Update products from one status to another in a specific category
+     */
+    @Modifying
+    @Query("UPDATE ProductJpaEntity p SET p.status = :newStatus WHERE p.category.id = :categoryId AND p.status = :currentStatus")
+    int updateSpecificStatusByCategory(@Param("categoryId") String categoryId, @Param("currentStatus") ProductStatus currentStatus, @Param("newStatus") ProductStatus newStatus);
+    
+    /**
+     * Find products by status and active category
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = :status AND p.category.active = true")
+    Page<ProductJpaEntity> findByStatusAndCategoryActive(@Param("status") ProductStatus status, Pageable pageable);
+    
+    /**
+     * Find products by category, status, and active category
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.category.id = :categoryId AND p.status = :status AND p.category.active = true")
+    List<ProductJpaEntity> findByCategory_IdAndStatusAndCategoryActive(@Param("categoryId") String categoryId, @Param("status") ProductStatus status);
+    
+    /**
      * Mark products as featured/unfeatured
      */
     @Modifying
@@ -282,4 +301,28 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, St
         ORDER BY (p.stockQuantity - p.minStockLevel) ASC
         """)
     List<ProductJpaEntity> getLowStockAlerts();
+
+    /**
+     * Find products by category active status
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.category.active = :categoryActive")
+    Page<ProductJpaEntity> findByCategoryActive(@Param("categoryActive") boolean categoryActive, Pageable pageable);
+    
+    /**
+     * Find products by status and category active status
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = :status AND p.category.active = :categoryActive")
+    Page<ProductJpaEntity> findByStatusAndCategoryActive(@Param("status") ProductStatus status, @Param("categoryActive") boolean categoryActive, Pageable pageable);
+    
+    /**
+     * Find active products from active categories only
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = 'ACTIVE' AND p.category.active = true")
+    Page<ProductJpaEntity> findActiveProductsFromActiveCategories(Pageable pageable);
+    
+    /**
+     * Find products by category ID, only if category is active
+     */
+    @Query("SELECT p FROM ProductJpaEntity p WHERE p.category.id = :categoryId AND p.category.active = true")
+    Page<ProductJpaEntity> findByCategoryIdAndCategoryActive(@Param("categoryId") String categoryId, Pageable pageable);
 } 

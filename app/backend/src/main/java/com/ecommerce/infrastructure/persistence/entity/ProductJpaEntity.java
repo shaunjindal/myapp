@@ -4,15 +4,14 @@ import com.ecommerce.domain.product.ProductStatus;
 import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * JPA Entity for Product
- * Maps the Product domain entity to the database
+ * Maps the Product domain entity to the database with normalized relationships
  */
 @Entity
 @Table(name = "products", indexes = {
@@ -86,25 +85,22 @@ public class ProductJpaEntity extends BaseJpaEntity {
     @Column(name = "weight", precision = 8, scale = 3)
     private BigDecimal weight;
 
-    // Product dimensions stored as JSON
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "dimensions", columnDefinition = "JSON")
-    private Map<String, Object> dimensions = new HashMap<>();
+    // Normalized relationships instead of JSON columns
+    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private ProductDimensionJpaEntity productDimensions;
 
-    // Product images stored as JSON array
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "images", columnDefinition = "JSON")
-    private List<String> images = new ArrayList<>();
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private List<ProductImageJpaEntity> productImages = new ArrayList<>();
 
-    // Product specifications stored as JSON
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "specifications", columnDefinition = "JSON")
-    private Map<String, Object> specifications = new HashMap<>();
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private List<ProductSpecificationJpaEntity> productSpecifications = new ArrayList<>();
 
-    // Product tags stored as JSON array
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "tags", columnDefinition = "JSON")
-    private Set<String> tags = new HashSet<>();
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private List<ProductTagJpaEntity> productTags = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -346,36 +342,149 @@ public class ProductJpaEntity extends BaseJpaEntity {
         this.weight = weight;
     }
 
+    // Backward compatibility methods for API - convert relationships to JSON format
+    @JsonProperty("dimensions")
     public Map<String, Object> getDimensions() {
+        if (productDimensions == null) {
+            return new HashMap<>();
+        }
+        Map<String, Object> dimensions = new HashMap<>();
+        dimensions.put("length", productDimensions.getLength());
+        dimensions.put("width", productDimensions.getWidth());
+        dimensions.put("height", productDimensions.getHeight());
+        dimensions.put("unit", productDimensions.getUnit() != null ? productDimensions.getUnit().name() : null);
+        dimensions.put("volume", productDimensions.getVolume());
         return dimensions;
     }
 
     public void setDimensions(Map<String, Object> dimensions) {
-        this.dimensions = dimensions;
+        if (dimensions == null || dimensions.isEmpty()) {
+            this.productDimensions = null;
+            return;
+        }
+        
+        // Convert map to ProductDimensionJpaEntity
+        if (this.productDimensions == null) {
+            this.productDimensions = new ProductDimensionJpaEntity();
+            this.productDimensions.setProduct(this);
+        }
+        
+        // Set dimension values from map
+        // This method will be used during deserialization
+        // The actual conversion logic will be handled in the service layer
     }
 
+    @JsonProperty("images")
     public List<String> getImages() {
-        return images;
+        if (productImages == null) {
+            return new ArrayList<>();
+        }
+        return productImages.stream()
+                .sorted(Comparator.comparing(ProductImageJpaEntity::getDisplayOrder))
+                .map(ProductImageJpaEntity::getImageUrl)
+                .collect(Collectors.toList());
     }
 
     public void setImages(List<String> images) {
-        this.images = images;
+        if (images == null) {
+            this.productImages = new ArrayList<>();
+            return;
+        }
+        
+        // Convert list to ProductImageJpaEntity objects
+        // This method will be used during deserialization
+        // The actual conversion logic will be handled in the service layer
     }
 
+    @JsonProperty("specifications")
     public Map<String, Object> getSpecifications() {
-        return specifications;
+        if (productSpecifications == null) {
+            return new HashMap<>();
+        }
+        return productSpecifications.stream()
+                .filter(spec -> spec.getIsVisible())
+                .collect(Collectors.toMap(
+                    ProductSpecificationJpaEntity::getSpecKey,
+                    ProductSpecificationJpaEntity::getSpecValue
+                ));
     }
 
     public void setSpecifications(Map<String, Object> specifications) {
-        this.specifications = specifications;
+        if (specifications == null) {
+            this.productSpecifications = new ArrayList<>();
+            return;
+        }
+        
+        // Convert map to ProductSpecificationJpaEntity objects
+        // This method will be used during deserialization
+        // The actual conversion logic will be handled in the service layer
     }
 
+    @JsonProperty("tags")
     public Set<String> getTags() {
-        return tags;
+        if (productTags == null) {
+            return new HashSet<>();
+        }
+        return productTags.stream()
+                .filter(tag -> tag.getIsVisible())
+                .map(ProductTagJpaEntity::getTagName)
+                .collect(Collectors.toSet());
     }
 
     public void setTags(Set<String> tags) {
-        this.tags = tags;
+        if (tags == null) {
+            this.productTags = new ArrayList<>();
+            return;
+        }
+        
+        // Convert set to ProductTagJpaEntity objects
+        // This method will be used during deserialization
+        // The actual conversion logic will be handled in the service layer
+    }
+
+    // Direct access to normalized relationships (for internal use)
+    public ProductDimensionJpaEntity getProductDimensions() {
+        return productDimensions;
+    }
+
+    public void setProductDimensions(ProductDimensionJpaEntity productDimensions) {
+        this.productDimensions = productDimensions;
+        if (productDimensions != null) {
+            productDimensions.setProduct(this);
+        }
+    }
+
+    public List<ProductImageJpaEntity> getProductImages() {
+        return productImages;
+    }
+
+    public void setProductImages(List<ProductImageJpaEntity> productImages) {
+        this.productImages = productImages;
+        if (productImages != null) {
+            productImages.forEach(image -> image.setProduct(this));
+        }
+    }
+
+    public List<ProductSpecificationJpaEntity> getProductSpecifications() {
+        return productSpecifications;
+    }
+
+    public void setProductSpecifications(List<ProductSpecificationJpaEntity> productSpecifications) {
+        this.productSpecifications = productSpecifications;
+        if (productSpecifications != null) {
+            productSpecifications.forEach(spec -> spec.setProduct(this));
+        }
+    }
+
+    public List<ProductTagJpaEntity> getProductTags() {
+        return productTags;
+    }
+
+    public void setProductTags(List<ProductTagJpaEntity> productTags) {
+        this.productTags = productTags;
+        if (productTags != null) {
+            productTags.forEach(tag -> tag.setProduct(this));
+        }
     }
 
     public ProductStatus getStatus() {
@@ -435,10 +544,29 @@ public class ProductJpaEntity extends BaseJpaEntity {
     }
 
     /**
-     * Get the main image URL (first image from the images list)
+     * Get the main image URL (primary image or first image from the images list)
      * @return The main image URL, or null if no images are available
      */
+    @JsonProperty("mainImageUrl")
     public String getMainImageUrl() {
-        return images != null && !images.isEmpty() ? images.get(0) : null;
+        if (productImages == null || productImages.isEmpty()) {
+            return null;
+        }
+        
+        // First try to find a primary image
+        Optional<ProductImageJpaEntity> primaryImage = productImages.stream()
+                .filter(img -> img.getIsPrimary())
+                .findFirst();
+        
+        if (primaryImage.isPresent()) {
+            return primaryImage.get().getImageUrl();
+        }
+        
+        // If no primary image, return the first image by display order
+        return productImages.stream()
+                .sorted(Comparator.comparing(ProductImageJpaEntity::getDisplayOrder))
+                .findFirst()
+                .map(ProductImageJpaEntity::getImageUrl)
+                .orElse(null);
     }
 } 

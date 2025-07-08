@@ -215,10 +215,22 @@ public class CategoryController {
      * Activate category
      */
     @PatchMapping("/{id}/activate")
-    public ResponseEntity<CategoryJpaEntity> activateCategory(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> activateCategory(@PathVariable String id) {
         try {
+            // Get product count before activation
+            long inactiveProductCount = categoryService.countProductsInCategoryTree(id) - 
+                                      categoryService.countActiveProductsInCategoryTree(id);
+            
             CategoryJpaEntity category = categoryService.activateCategory(id);
-            return ResponseEntity.ok(category);
+            
+            // Get product count after activation
+            long activeProductCount = categoryService.countActiveProductsInCategoryTree(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("category", category);
+            response.put("productsActivated", activeProductCount - (categoryService.countProductsInCategoryTree(id) - inactiveProductCount));
+            
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
@@ -228,10 +240,18 @@ public class CategoryController {
      * Deactivate category
      */
     @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<CategoryJpaEntity> deactivateCategory(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> deactivateCategory(@PathVariable String id) {
         try {
+            // Get active product count before deactivation
+            long activeProductCount = categoryService.countActiveProductsInCategoryTree(id);
+            
             CategoryJpaEntity category = categoryService.deactivateCategory(id);
-            return ResponseEntity.ok(category);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("category", category);
+            response.put("productsDeactivated", activeProductCount);
+            
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
@@ -241,11 +261,21 @@ public class CategoryController {
      * Deactivate category and all descendants
      */
     @PatchMapping("/{id}/deactivate-tree")
-    public ResponseEntity<Map<String, Integer>> deactivateCategoryTree(@PathVariable String id) {
-        int deactivatedCount = categoryService.deactivateCategoryAndDescendants(id);
-        Map<String, Integer> response = new HashMap<>();
-        response.put("deactivatedCount", deactivatedCount);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Map<String, Object>> deactivateCategoryTree(@PathVariable String id) {
+        try {
+            // Get active product count before deactivation
+            long activeProductCount = categoryService.countActiveProductsInCategoryTree(id);
+            
+            int deactivatedCount = categoryService.deactivateCategoryAndDescendants(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("deactivatedCategories", deactivatedCount);
+            response.put("productsDeactivated", activeProductCount);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -328,5 +358,41 @@ public class CategoryController {
             categoryService.getCategoriesWithActiveProducts() : 
             categoryService.getCategoriesWithProducts();
         return ResponseEntity.ok(categories);
+    }
+
+    /**
+     * Test endpoint to verify category-product synchronization status
+     */
+    @GetMapping("/{id}/sync-status")
+    public ResponseEntity<Map<String, Object>> getCategorySyncStatus(@PathVariable String id) {
+        try {
+            CategoryJpaEntity category = categoryService.getCategoryById(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("categoryId", category.getId());
+            response.put("categoryName", category.getName());
+            response.put("categoryActive", category.isActive());
+            response.put("totalProducts", categoryService.countProductsInCategoryTree(id));
+            response.put("activeProducts", categoryService.countActiveProductsInCategoryTree(id));
+            
+            // Check if there are any inconsistencies
+            boolean hasInconsistencies = false;
+            if (category.isActive()) {
+                // If category is active, check if any products are inactive due to category issues
+                long inactiveProducts = categoryService.countProductsInCategoryTree(id) - 
+                                      categoryService.countActiveProductsInCategoryTree(id);
+                response.put("inactiveProducts", inactiveProducts);
+                hasInconsistencies = inactiveProducts > 0;
+            } else {
+                // If category is inactive, active products count should be 0
+                hasInconsistencies = categoryService.countActiveProductsInCategoryTree(id) > 0;
+            }
+            
+            response.put("synchronized", !hasInconsistencies);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 } 

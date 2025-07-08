@@ -47,7 +47,8 @@ public class ProductController {
             @RequestParam(value = "categoryId", required = false) String categoryId,
             @RequestParam(value = "minPrice", required = false) BigDecimal minPrice,
             @RequestParam(value = "maxPrice", required = false) BigDecimal maxPrice,
-            @RequestParam(value = "name", required = false) String name) {
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "includeInactiveCategories", defaultValue = "false") boolean includeInactiveCategories) {
 
         Page<ProductJpaEntity> products;
 
@@ -57,9 +58,19 @@ public class ProductController {
             products = productService.searchProducts(name, brand, categoryId, 
                                                    minPrice, maxPrice, featured, pageable);
         } else if (status != null) {
-            products = productService.getProductsByStatus(status, pageable);
+            if (includeInactiveCategories) {
+                products = productService.getProductsByStatus(status, pageable);
+            } else {
+                // Default behavior: only show products from active categories
+                products = productService.getProductsByStatusAndActiveCategory(status, pageable);
+            }
         } else {
-            products = productService.getAllProducts(pageable);
+            if (includeInactiveCategories) {
+                products = productService.getAllProducts(pageable);
+            } else {
+                // Default behavior: only show products from active categories
+                products = productService.getAllProductsFromActiveCategories(pageable);
+            }
         }
 
         return ResponseEntity.ok(products);
@@ -71,7 +82,7 @@ public class ProductController {
     @GetMapping("/active")
     public ResponseEntity<Page<ProductJpaEntity>> getActiveProducts(
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        Page<ProductJpaEntity> products = productService.getActiveProducts(pageable);
+        Page<ProductJpaEntity> products = productService.getVisibleProducts(pageable);
         return ResponseEntity.ok(products);
     }
 
@@ -99,7 +110,7 @@ public class ProductController {
     }
 
     /**
-     * Get products by category
+     * Get products by category (only active category products)
      */
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<Page<ProductJpaEntity>> getProductsByCategory(
@@ -110,7 +121,16 @@ public class ProductController {
     }
 
     /**
-     * Get products in category tree (including subcategories)
+     * Get active products by active category
+     */
+    @GetMapping("/category/{categoryId}/active")
+    public ResponseEntity<List<ProductJpaEntity>> getActiveProductsByActiveCategory(@PathVariable String categoryId) {
+        List<ProductJpaEntity> products = productService.getActiveProductsByActiveCategory(categoryId);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
+     * Get products in category tree (including subcategories) - active category only
      */
     @GetMapping("/category/{categoryId}/tree")
     public ResponseEntity<List<ProductJpaEntity>> getProductsInCategoryTree(@PathVariable String categoryId) {

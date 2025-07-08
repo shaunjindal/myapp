@@ -3,6 +3,7 @@ package com.ecommerce.application.service;
 import com.ecommerce.infrastructure.persistence.entity.CategoryJpaEntity;
 import com.ecommerce.infrastructure.persistence.repository.CategoryJpaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,12 @@ import java.util.Optional;
 public class CategoryService {
 
     private final CategoryJpaRepository categoryRepository;
+    private final ProductService productService;
 
     @Autowired
-    public CategoryService(CategoryJpaRepository categoryRepository) {
+    public CategoryService(CategoryJpaRepository categoryRepository, @Lazy ProductService productService) {
         this.categoryRepository = categoryRepository;
+        this.productService = productService;
     }
 
     // Category CRUD operations
@@ -318,7 +321,12 @@ public class CategoryService {
     public CategoryJpaEntity activateCategory(String categoryId) {
         CategoryJpaEntity category = getCategoryById(categoryId);
         category.setActive(true);
-        return categoryRepository.save(category);
+        CategoryJpaEntity savedCategory = categoryRepository.save(category);
+        
+        // Synchronize product status - activate products that were previously inactive
+        int activatedProducts = productService.activateProductsByCategory(categoryId);
+        
+        return savedCategory;
     }
 
     /**
@@ -327,14 +335,33 @@ public class CategoryService {
     public CategoryJpaEntity deactivateCategory(String categoryId) {
         CategoryJpaEntity category = getCategoryById(categoryId);
         category.setActive(false);
-        return categoryRepository.save(category);
+        CategoryJpaEntity savedCategory = categoryRepository.save(category);
+        
+        // Synchronize product status - deactivate all active products in this category
+        int deactivatedProducts = productService.deactivateProductsByCategory(categoryId);
+        
+        return savedCategory;
     }
 
     /**
      * Deactivate category and all its descendants
      */
     public int deactivateCategoryAndDescendants(String categoryId) {
-        return categoryRepository.deactivateCategoryAndDescendants(categoryId);
+        // First get all descendants before deactivating
+        List<CategoryJpaEntity> allDescendants = getAllDescendants(categoryId);
+        
+        // Deactivate the category tree
+        int deactivatedCount = categoryRepository.deactivateCategoryAndDescendants(categoryId);
+        
+        // Synchronize product status for the root category
+        productService.deactivateProductsByCategory(categoryId);
+        
+        // Synchronize product status for all descendants
+        for (CategoryJpaEntity descendant : allDescendants) {
+            productService.deactivateProductsByCategory(descendant.getId());
+        }
+        
+        return deactivatedCount;
     }
 
     // Utility methods

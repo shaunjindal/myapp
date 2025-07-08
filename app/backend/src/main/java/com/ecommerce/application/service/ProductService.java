@@ -71,6 +71,26 @@ public class ProductService {
             throw new IllegalArgumentException("Product with SKU '" + updatedProduct.getSku() + "' already exists");
         }
 
+        // Update category if provided and validate category status
+        if (updatedProduct.getCategory() != null && updatedProduct.getCategory().getId() != null) {
+            CategoryJpaEntity newCategory = categoryRepository.findById(updatedProduct.getCategory().getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+            
+            // If product is being moved to a different category, validate the new category
+            if (!existingProduct.getCategory().getId().equals(newCategory.getId()) && 
+                updatedProduct.getStatus() == ProductStatus.ACTIVE && !newCategory.isActive()) {
+                throw new IllegalArgumentException("Cannot move active product to inactive category: " + newCategory.getName());
+            }
+            
+            existingProduct.setCategory(newCategory);
+        }
+
+        // Validate status change - cannot activate product if category is inactive
+        if (updatedProduct.getStatus() == ProductStatus.ACTIVE && 
+            !existingProduct.getCategory().isActive()) {
+            throw new IllegalArgumentException("Cannot activate product in inactive category: " + existingProduct.getCategory().getName());
+        }
+
         // Update fields
         existingProduct.setName(updatedProduct.getName());
         existingProduct.setDescription(updatedProduct.getDescription());
@@ -89,13 +109,6 @@ public class ProductService {
         existingProduct.setMetaTitle(updatedProduct.getMetaTitle());
         existingProduct.setMetaDescription(updatedProduct.getMetaDescription());
         existingProduct.setMetaKeywords(updatedProduct.getMetaKeywords());
-
-        // Update category if provided
-        if (updatedProduct.getCategory() != null && updatedProduct.getCategory().getId() != null) {
-            CategoryJpaEntity category = categoryRepository.findById(updatedProduct.getCategory().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
-            existingProduct.setCategory(category);
-        }
 
         return productRepository.save(existingProduct);
     }
@@ -134,11 +147,27 @@ public class ProductService {
     }
 
     /**
+     * Get all products from active categories only
+     */
+    @Transactional(readOnly = true)
+    public Page<ProductJpaEntity> getAllProductsFromActiveCategories(Pageable pageable) {
+        return productRepository.findByCategoryActive(true, pageable);
+    }
+
+    /**
      * Get products by status
      */
     @Transactional(readOnly = true)
     public Page<ProductJpaEntity> getProductsByStatus(ProductStatus status, Pageable pageable) {
         return productRepository.findByStatus(status, pageable);
+    }
+
+    /**
+     * Get products by status from active categories only
+     */
+    @Transactional(readOnly = true)
+    public Page<ProductJpaEntity> getProductsByStatusAndActiveCategory(ProductStatus status, Pageable pageable) {
+        return productRepository.findByStatusAndCategoryActive(status, pageable);
     }
 
     /**
@@ -388,6 +417,12 @@ public class ProductService {
      */
     public ProductJpaEntity activateProduct(String productId) {
         ProductJpaEntity product = getProductById(productId);
+        
+        // Check if category is active before allowing product activation
+        if (!product.getCategory().isActive()) {
+            throw new IllegalStateException("Cannot activate product in inactive category: " + product.getCategory().getName());
+        }
+        
         product.setStatus(ProductStatus.ACTIVE);
         return productRepository.save(product);
     }
@@ -417,6 +452,42 @@ public class ProductService {
         ProductJpaEntity product = getProductById(productId);
         product.setFeatured(featured);
         return productRepository.save(product);
+    }
+
+    // Category-Product Status Synchronization Methods
+
+    /**
+     * Update product status when category is deactivated
+     * Deactivates all active products in the category
+     */
+    public int deactivateProductsByCategory(String categoryId) {
+        // Only deactivate products that are currently ACTIVE
+        return productRepository.updateStatusByCategory(categoryId, ProductStatus.INACTIVE);
+    }
+
+    /**
+     * Update product status when category is activated
+     * Note: This should be used carefully - only activate products that were previously active
+     */
+    public int activateProductsByCategory(String categoryId) {
+        // Only activate products that are currently INACTIVE (not DRAFT, DISCONTINUED, etc.)
+        return productRepository.updateSpecificStatusByCategory(categoryId, ProductStatus.INACTIVE, ProductStatus.ACTIVE);
+    }
+
+    /**
+     * Get products that should be visible to customers (considers category status)
+     */
+    @Transactional(readOnly = true)
+    public Page<ProductJpaEntity> getVisibleProducts(Pageable pageable) {
+        return productRepository.findByStatusAndCategoryActive(ProductStatus.ACTIVE, pageable);
+    }
+
+    /**
+     * Get products by category that are both active and have active category
+     */
+    @Transactional(readOnly = true)
+    public List<ProductJpaEntity> getActiveProductsByActiveCategory(String categoryId) {
+        return productRepository.findByCategory_IdAndStatusAndCategoryActive(categoryId, ProductStatus.ACTIVE);
     }
 
     // Analytics and reporting
