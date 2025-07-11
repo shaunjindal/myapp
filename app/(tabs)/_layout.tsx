@@ -58,10 +58,13 @@ export default function TabLayout() {
   const shouldHideTabs = () => {
     const currentSegments = segments;
     
-    // Hide tabs on checkout flow pages
+    // Hide tabs on specific payment and order completion pages
     if (currentSegments.length >= 3 && currentSegments[0] === '(tabs)' && currentSegments[1] === 'cart') {
       const cartPage = currentSegments[2];
-      return cartPage === 'checkout' || cartPage === 'payment-processing' || cartPage === 'order-success';
+      return cartPage === 'payment-processing' || 
+             cartPage === 'payment-processing-online' || 
+             cartPage === 'order-processing' ||
+             cartPage === 'order-success';
     }
     
     return false;

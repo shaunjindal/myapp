@@ -9,14 +9,15 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useCartStore } from '../../../src/store/cartStore';
 import { useAuthStore } from '../../../src/store/authStore';
-import { CartItem } from '../../../src/components/CartItem';
 import { Button } from '../../../src/components/Button';
 import { BackButtonHeader } from '../../../src/components/BackButtonHeader';
 import { LoginPromptBottomSheet } from '../../../src/components/LoginPromptBottomSheet';
+import { OrderSummary } from '../../../src/components/OrderSummary';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -26,6 +27,18 @@ export default function CartScreen() {
   const { isAuthenticated, addOrder } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  const CustomCartHeader = () => (
+    <View style={styles.header}>
+      <View style={styles.headerContent}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/home')} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Shopping Cart</Text>
+        <View style={styles.spacer} />
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     // Just add a small delay to prevent flash since cart is already initialized by initStore
@@ -68,7 +81,7 @@ export default function CartScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <BackButtonHeader title="Shopping Cart" />
+        <CustomCartHeader />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary[600]} />
           <Text style={styles.loadingText}>Loading your cart...</Text>
@@ -80,7 +93,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <BackButtonHeader title="Shopping Cart" />
+        <CustomCartHeader />
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
             <Ionicons name="cart-outline" size={80} color={theme.colors.gray[400]} />
@@ -106,7 +119,7 @@ export default function CartScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <BackButtonHeader title="Shopping Cart" />
+      <CustomCartHeader />
       <View style={styles.subHeader}>
         <View style={styles.subHeaderLeft}>
           <Text style={styles.subtitle}>{itemCount} item{itemCount !== 1 ? 's' : ''}</Text>
@@ -118,51 +131,109 @@ export default function CartScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.itemsContainer}>
-          {items.map((item) => (
-            <CartItem
-              key={item.id}
-              item={item}
-              onUpdateQuantity={updateQuantity}
-              onRemove={removeItem}
-            />
-          ))}
+        {/* Items List */}
+        <View style={styles.itemsCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="bag-outline" size={20} color={theme.colors.primary[600]} />
+            </View>
+            <Text style={styles.cardTitle}>Your Items</Text>
+            <View style={styles.itemCountBadge}>
+              <Text style={styles.itemCountText}>{itemCount} items</Text>
+            </View>
+          </View>
+          
+          <View style={styles.itemsList}>
+            {items.map((item, index) => (
+              <View key={item.id} style={[
+                styles.cartItem,
+                index === items.length - 1 && styles.lastCartItem
+              ]}>
+                <View style={styles.productImageContainer}>
+                  <Image source={{ uri: item.product.image }} style={styles.productImage} />
+                  <View style={styles.quantityBadge}>
+                    <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.itemDetails}>
+                  <View style={styles.itemHeader}>
+                    <View style={styles.itemTitleContainer}>
+                      <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
+                      {item.product.brand && (
+                        <View style={styles.brandContainer}>
+                          <Text style={styles.brandText}>{item.product.brand}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => removeItem(item.product.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="close" size={18} color={theme.colors.gray[500]} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.itemFooter}>
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          if (item.quantity === 1) {
+                            // Remove item when quantity would go to 0
+                            removeItem(item.product.id);
+                          } else {
+                            // Decrement quantity
+                            updateQuantity(item.product.id, item.quantity - 1);
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={16}
+                          color={theme.colors.primary[600]}
+                        />
+                      </TouchableOpacity>
+                      
+                      <Text style={styles.quantityText}>{item.quantity}</Text>
+                      
+                      <TouchableOpacity
+                        style={[
+                          styles.quantityButton,
+                          item.quantity >= item.product.stockQuantity && styles.quantityButtonDisabled,
+                        ]}
+                        onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        disabled={item.quantity >= item.product.stockQuantity}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={16}
+                          color={item.quantity >= item.product.stockQuantity ? theme.colors.gray[400] : theme.colors.primary[600]}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <View style={styles.itemPriceContainer}>
+                      <Text style={styles.unitPrice}>${item.product.price.toFixed(2)} each</Text>
+                      <Text style={styles.itemTotal}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Order Summary */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Order Summary</Text>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>${total.toFixed(2)}</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Shipping</Text>
-            <Text style={styles.summaryValue}>Free</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tax</Text>
-            <Text style={styles.summaryValue}>${(total * 0.08).toFixed(2)}</Text>
-          </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${(total * 1.08).toFixed(2)}</Text>
-          </View>
-        </View>
+        <OrderSummary
+          items={items}
+          showItems={false}
+          collapsible={false}
+        />
       </ScrollView>
 
       <View style={styles.footer}>
-        <View style={styles.totalContainer}>
-          <Text style={styles.footerTotalLabel}>Total</Text>
-          <Text style={styles.footerTotalAmount}>${(total * 1.08).toFixed(2)}</Text>
-        </View>
-        
         <Button
           title="Proceed to Checkout"
           onPress={handleCheckout}
@@ -190,16 +261,30 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   header: {
-    backgroundColor: theme.colors.background,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.lg,
-    ...theme.shadows.sm,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[200],
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    height: 44,
+  },
+  backButton: {
+    marginRight: theme.spacing.md,
+    padding: 4,
+  },
+  title: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
+  spacer: {
+    width: 36, // Same width as back button to center title
   },
   subHeader: {
     backgroundColor: theme.colors.background,
@@ -216,16 +301,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  backButton: {
-    padding: theme.spacing.md,
-    marginLeft: -theme.spacing.md,
-    marginRight: theme.spacing.sm,
-  },
-  title: {
-    fontSize: theme.typography.sizes['2xl'],
-    fontWeight: '700' as any,
-    color: theme.colors.text.primary,
   },
   subtitle: {
     fontSize: theme.typography.sizes.sm,
@@ -253,6 +328,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingTop: theme.spacing.md,
   },
   itemsContainer: {
     paddingHorizontal: theme.spacing.xl,
@@ -279,7 +355,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.primary,
     fontWeight: '500' as any,
   },
   summaryValue: {
@@ -289,8 +365,8 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.gray[200],
-    marginVertical: theme.spacing.lg,
+    backgroundColor: theme.colors.gray[300],
+    marginVertical: theme.spacing.md,
   },
   totalLabel: {
     fontSize: theme.typography.sizes.lg,
@@ -298,7 +374,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as any,
   },
   totalValue: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: theme.typography.sizes.xl,
     color: theme.colors.primary[600],
     fontWeight: '700' as any,
   },
@@ -335,22 +411,6 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.gray[200],
     ...theme.shadows.lg,
   },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  footerTotalLabel: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '600' as any,
-    color: theme.colors.text.primary,
-  },
-  footerTotalAmount: {
-    fontSize: theme.typography.sizes['2xl'],
-    fontWeight: '700' as any,
-    color: theme.colors.primary[600],
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -363,4 +423,171 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     textAlign: 'center',
   },
+  
+  // New Modern Design Styles
+  itemsCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  cardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  cardTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
+  itemCountBadge: {
+    backgroundColor: theme.colors.primary[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+  },
+  itemCountText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.primary[700],
+    fontWeight: '600',
+  },
+  itemsList: {
+    gap: theme.spacing.sm,
+  },
+  cartItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[200],
+  },
+  lastCartItem: {
+    borderBottomWidth: 0,
+  },
+  productImageContainer: {
+    position: 'relative',
+    marginRight: theme.spacing.md,
+  },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.gray[100],
+  },
+  quantityBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: theme.colors.primary[600],
+    borderRadius: theme.borderRadius.full,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  quantityBadgeText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.background,
+    fontWeight: '700',
+  },
+  itemDetails: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.sm,
+  },
+  itemTitleContainer: {
+    flex: 1,
+    marginRight: theme.spacing.md,
+  },
+  brandContainer: {
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.xs,
+  },
+  brandText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.primary[600],
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  itemName: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.base,
+  },
+  removeButton: {
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: theme.borderRadius.full,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: theme.borderRadius.lg,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  quantityButton: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  quantityButtonDisabled: {
+    backgroundColor: theme.colors.gray[200],
+  },
+  quantityText: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginHorizontal: theme.spacing.md,
+    minWidth: 20,
+    textAlign: 'center',
+  },
+  itemPriceContainer: {
+    alignItems: 'flex-end',
+  },
+  unitPrice: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.xs,
+  },
+  itemTotal: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  // No longer needed - styles moved to OrderSummary component
 }); 

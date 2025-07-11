@@ -282,7 +282,7 @@ export const mapProductDtoToProduct = (productDto: any) => ({
   rating: productDto.rating || productDto.averageRating || 4.5,
   reviewCount: productDto.reviewCount || 0,
   inStock: productDto.available !== undefined ? productDto.available : (productDto.status === 'ACTIVE' && productDto.stockQuantity > 0),
-  stockQuantity: productDto.stock || productDto.stockQuantity || 0,
+  stockQuantity: productDto.stock || productDto.stockQuantity || 999,
   brand: productDto.brand || 'Unknown',
   specifications: productDto.specifications || {},
   tags: productDto.tags || [],

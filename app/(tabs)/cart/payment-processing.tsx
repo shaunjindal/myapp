@@ -17,6 +17,8 @@ import { useAddressStore } from '../../../src/store/addressStore';
 import { useOrderStore } from '../../../src/store/orderStore';
 import orderService from '../../../src/services/orderService';
 import { PaymentMethod } from '../../../src/types/order';
+import { useRazorpayPayment } from '../../../src/hooks/useRazorpayPayment';
+import { useCartStore as useCartStoreForTotal } from '../../../src/store/cartStore';
 
 export default function PaymentProcessingScreen() {
   const router = useRouter();
@@ -25,12 +27,14 @@ export default function PaymentProcessingScreen() {
     paymentMethod: string;
   }>();
   
-  const { clearCart } = useCartStore();
+  const { clearCart, items, total } = useCartStore();
   const { user } = useAuthStore();
   const { addresses } = useAddressStore();
   const { addNewOrder } = useOrderStore();
+  const { initiatePayment, isLoading: isPaymentLoading } = useRazorpayPayment();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessingRazorpay, setIsProcessingRazorpay] = useState(false);
 
   // Prevent back button during payment processing
   useFocusEffect(
@@ -101,22 +105,74 @@ export default function PaymentProcessingScreen() {
               return PaymentMethod.BANK_TRANSFER;
             case 'cash_on_delivery':
               return PaymentMethod.CASH_ON_DELIVERY;
+            case 'razorpay_card':
+              return PaymentMethod.RAZORPAY_CARD;
+            case 'razorpay_upi':
+              return PaymentMethod.RAZORPAY_UPI;
             default:
               return PaymentMethod.CREDIT_CARD; // Default fallback
           }
         };
 
-        const orderRequest = {
-          billingAddressId: selectedAddressId,
-          shippingAddressId: selectedAddressId,
-          paymentMethod: mapPaymentMethod(paymentMethod),
-          customerNotes: ''
-        };
-
-        const order = await orderService.createOrderFromCart(orderRequest);
+        const mappedPaymentMethod = mapPaymentMethod(paymentMethod);
         
+        console.log('💳 Payment Method Selected:', paymentMethod);
+        console.log('💳 Mapped Payment Method:', mappedPaymentMethod);
+        
+        // Check if this is a Razorpay payment method that requires online processing
+        const isRazorpayPayment = mappedPaymentMethod === PaymentMethod.RAZORPAY_CARD || 
+                                  mappedPaymentMethod === PaymentMethod.RAZORPAY_UPI;
+
+        console.log('💳 Is Razorpay Payment:', isRazorpayPayment);
+
+        let createdOrder;
+        
+        if (isRazorpayPayment) {
+          // For Razorpay payments, first create order, then initiate payment
+          setIsProcessingRazorpay(true);
+          
+          // First create the order (without payment)
+          const orderRequest = {
+            billingAddressId: selectedAddressId,
+            shippingAddressId: selectedAddressId,
+            paymentMethod: mappedPaymentMethod,
+            customerNotes: 'Razorpay payment pending'
+          };
+
+          createdOrder = await orderService.createOrderFromCart(orderRequest);
+          
+          // Now initiate payment with the real order ID
+          const paymentResult = await initiatePayment({
+            amount: total,
+            currency: 'INR',
+            orderId: createdOrder.id,
+            name: 'E-Commerce App',
+            description: `Payment for order ${createdOrder.orderNumber}`,
+            email: user.email,
+          });
+
+          setIsProcessingRazorpay(false);
+
+          if (!paymentResult.success) {
+            throw new Error(paymentResult.error || 'Payment failed');
+          }
+
+          // Payment successful, update order notes
+          createdOrder.customerNotes = `Razorpay Payment ID: ${paymentResult.paymentId}`;
+        } else {
+          // For non-Razorpay payments (like COD), create order directly
+          const orderRequest = {
+            billingAddressId: selectedAddressId,
+            shippingAddressId: selectedAddressId,
+            paymentMethod: mappedPaymentMethod,
+            customerNotes: ''
+          };
+
+          createdOrder = await orderService.createOrderFromCart(orderRequest);
+        }
+
         // Add order to the simple store
-        addNewOrder(order);
+        addNewOrder(createdOrder);
         
         // Clear cart after successful order creation
         await clearCart();
@@ -127,7 +183,7 @@ export default function PaymentProcessingScreen() {
         // Navigate to success screen with order data
         router.replace({
           pathname: '/(tabs)/cart/order-success',
-          params: { orderNumber: order.orderNumber, orderId: order.id }
+          params: { orderNumber: createdOrder.orderNumber, orderId: createdOrder.id }
         });
         
       } catch (error) {

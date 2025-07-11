@@ -16,9 +16,10 @@ import orderService from '../../../src/services/orderService';
 
 export default function OrderSuccessScreen() {
   const router = useRouter();
-  const { orderNumber, orderId } = useLocalSearchParams<{
+  const { orderNumber, orderId, paymentId } = useLocalSearchParams<{
     orderNumber: string;
     orderId: string;
+    paymentId?: string;
   }>();
   
   const [order, setOrder] = useState<any>(null);
@@ -99,6 +100,13 @@ export default function OrderSuccessScreen() {
             <Text style={styles.detailLabel}>Order Number:</Text>
             <Text style={styles.detailValue}>{orderNumber || 'Loading...'}</Text>
           </View>
+          
+          {paymentId && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Payment ID:</Text>
+              <Text style={styles.detailValue}>{paymentId}</Text>
+            </View>
+          )}
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Estimated Delivery:</Text>

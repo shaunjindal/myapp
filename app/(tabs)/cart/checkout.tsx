@@ -14,6 +14,7 @@ import {
   Animated,
   Dimensions,
   TouchableWithoutFeedback,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useCartStore } from '../../../src/store/cartStore';
@@ -21,17 +22,55 @@ import { useAddressStore } from '../../../src/store/addressStore';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { AddAddressModal } from '../../../src/components/AddAddressModal';
+import { OrderSummary } from '../../../src/components/OrderSummary';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../src/styles/theme';
 import { AddressDto } from '../../../src/types/api';
 
-const paymentMethods = [
-  { id: 'credit', name: 'Credit Card', icon: 'card', details: '**** **** **** 1234' },
-  { id: 'paypal', name: 'PayPal', icon: 'logo-paypal', details: 'demo@example.com' },
-  { id: 'apple', name: 'Apple Pay', icon: 'logo-apple', details: 'Touch ID' },
-];
-
 const { height: screenHeight } = Dimensions.get('window');
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  subtitle: string;
+  icon: string;
+  recommended?: boolean;
+  comingSoon?: boolean;
+}
+
+const paymentMethods: PaymentMethod[] = [
+  {
+    id: 'upi',
+    name: 'UPI',
+    subtitle: 'Pay using PhonePe, Paytm, Google Pay & more',
+    icon: 'phone-portrait',
+    recommended: true,
+  },
+  {
+    id: 'cards',
+    name: 'Cards',
+    subtitle: 'Credit, Debit & ATM cards',
+    icon: 'card',
+  },
+  {
+    id: 'netbanking',
+    name: 'Net Banking',
+    subtitle: 'All major banks supported',
+    icon: 'business',
+  },
+  {
+    id: 'wallets',
+    name: 'Wallets',
+    subtitle: 'PhonePe, Paytm, Amazon Pay & more',
+    icon: 'wallet',
+  },
+  {
+    id: 'cod',
+    name: 'Cash on Delivery',
+    subtitle: 'Pay when your order arrives',
+    icon: 'cash',
+  },
+];
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -43,11 +82,16 @@ export default function CheckoutScreen() {
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showAddressBottomSheet, setShowAddressBottomSheet] = useState(false);
   
+  // Payment method state
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('upi');
+  
+  // Order summary collapse state
+  const [isOrderSummaryExpanded, setIsOrderSummaryExpanded] = useState(false);
+  
   // Animation values for bottom sheet
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   
-  const [paymentMethod, setPaymentMethod] = useState('credit');
   const [loading, setLoading] = useState(false);
 
   // Fetch addresses when component mounts (will use cache if available)
@@ -126,6 +170,10 @@ export default function CheckoutScreen() {
     hideBottomSheet();
   };
 
+  const handlePaymentMethodSelect = (methodId: string) => {
+    setSelectedPaymentMethod(methodId);
+  };
+
   const handleProceedToPayment = () => {
     // Validate address selection
     if (!selectedAddressId) {
@@ -133,21 +181,111 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Validate payment method selection
+    if (!selectedPaymentMethod) {
+      Alert.alert('Error', 'Please select a payment method');
+      return;
+    }
+
     setLoading(true);
-    // Navigate to payment processing screen with parameters
-    router.push({
-      pathname: '/(tabs)/cart/payment-processing',
-      params: {
-        selectedAddressId,
-        paymentMethod,
+    
+    if (selectedPaymentMethod === 'cod') {
+      // For COD, go directly to order creation
+      router.push({
+        pathname: '/(tabs)/cart/order-processing',
+        params: {
+          selectedAddressId,
+          paymentMethod: 'cash_on_delivery',
+          skipPayment: 'true',
+        }
+      });
+    } else {
+      // For online payments, go to payment processing
+      let mappedPaymentMethod = 'razorpay_card';
+      if (selectedPaymentMethod === 'upi') {
+        mappedPaymentMethod = 'razorpay_upi';
       }
-    });
+      
+      router.push({
+        pathname: '/(tabs)/cart/payment-processing-online',
+        params: {
+          selectedAddressId,
+          paymentMethod: mappedPaymentMethod,
+          amount: total.toString(),
+        }
+      });
+    }
   };
 
-  const subtotal = total;
-  const tax = subtotal * 0.08; // 8% tax
-  const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
-  const finalTotal = subtotal + tax + shipping;
+  const renderPaymentMethod = (method: PaymentMethod) => {
+    const isSelected = selectedPaymentMethod === method.id;
+    
+    return (
+      <TouchableOpacity
+        key={method.id}
+        style={[
+          styles.paymentMethodCard,
+          isSelected && styles.selectedPaymentMethod,
+          method.comingSoon && styles.disabledPaymentMethod,
+        ]}
+        onPress={() => !method.comingSoon && handlePaymentMethodSelect(method.id)}
+        disabled={method.comingSoon}
+      >
+        <View style={styles.paymentMethodContent}>
+          <View style={styles.paymentMethodLeft}>
+            <View style={[
+              styles.paymentMethodIcon,
+              isSelected && styles.selectedPaymentMethodIcon
+            ]}>
+              <Ionicons 
+                name={method.icon as any} 
+                size={24} 
+                color={isSelected ? theme.colors.primary[600] : theme.colors.gray[600]} 
+              />
+            </View>
+            <View style={styles.paymentMethodText}>
+              <View style={styles.paymentMethodHeader}>
+                <Text style={[
+                  styles.paymentMethodName,
+                  isSelected && styles.selectedPaymentMethodName
+                ]}>
+                  {method.name}
+                </Text>
+                {method.recommended && (
+                  <View style={styles.recommendedBadge}>
+                    <Text style={styles.recommendedText}>RECOMMENDED</Text>
+                  </View>
+                )}
+                {method.comingSoon && (
+                  <View style={styles.comingSoonBadge}>
+                    <Text style={styles.comingSoonText}>COMING SOON</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[
+                styles.paymentMethodSubtitle,
+                method.comingSoon && styles.disabledText
+              ]}>
+                {method.subtitle}
+              </Text>
+            </View>
+          </View>
+          <View style={[
+            styles.radioButton,
+            isSelected && styles.selectedRadioButton
+          ]}>
+            {isSelected && (
+              <View style={styles.radioButtonInner} />
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Calculate shipping based on subtotal
+  const shipping = total > 50 ? 0 : 9.99; // Free shipping over $50
+  const finalTotal = total + (total * 0.08) + shipping;
 
   // Get the selected address or default address
   const selectedAddress = addresses.find((addr: AddressDto) => addr.id === selectedAddressId);
@@ -189,41 +327,25 @@ export default function CheckoutScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-        {/* Order Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
-          {items.map((item) => (
-            <View key={item.id} style={styles.orderItem}>
-              <Text style={styles.itemName}>{item.product.name}</Text>
-              <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-              <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
-            </View>
-          ))}
-          
-          <View style={styles.orderSummary}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal:</Text>
-              <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax:</Text>
-              <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Shipping:</Text>
-              <Text style={styles.summaryValue}>${shipping.toFixed(2)}</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
-            </View>
-          </View>
-        </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Order Summary Card */}
+        <OrderSummary
+          items={items}
+          shippingCost={shipping}
+          showItems={true}
+          collapsible={true}
+          isExpanded={isOrderSummaryExpanded}
+          onToggleExpanded={() => setIsOrderSummaryExpanded(!isOrderSummaryExpanded)}
+        />
 
-        {/* Shipping Address */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shipping Address</Text>
+        {/* Shipping Address Card */}
+        <View style={styles.addressCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="location-outline" size={20} color={theme.colors.primary[600]} />
+            </View>
+            <Text style={styles.cardTitle}>Shipping Address</Text>
+          </View>
 
           {addressesLoading ? (
             <View style={styles.loadingContainer}>
@@ -232,7 +354,9 @@ export default function CheckoutScreen() {
             </View>
           ) : addresses.length === 0 ? (
             <View style={styles.noAddressesContainer}>
-              <Ionicons name="location-outline" size={48} color={theme.colors.gray[400]} />
+              <View style={styles.emptyStateIcon}>
+                <Ionicons name="location-outline" size={32} color={theme.colors.gray[400]} />
+              </View>
               <Text style={styles.noAddressesText}>No saved addresses</Text>
               <Text style={styles.noAddressesSubtext}>Add your first address to continue</Text>
               <TouchableOpacity
@@ -250,24 +374,34 @@ export default function CheckoutScreen() {
                 <View style={styles.selectedAddressCard}>
                   <View style={styles.addressContent}>
                     <View style={styles.addressHeader}>
-                      <Text style={styles.addressType}>
-                        {displayAddress.type === 'SHIPPING' ? 'Home' : displayAddress.type === 'BILLING' ? 'Work' : 'Other'}
-                      </Text>
-                      {displayAddress.isDefault && (
-                        <View style={styles.defaultBadge}>
-                          <Text style={styles.defaultBadgeText}>Default</Text>
+                      <View style={styles.addressTypeContainer}>
+                        <View style={styles.addressTypeIcon}>
+                          <Ionicons 
+                            name={displayAddress.type === 'SHIPPING' ? 'home' : displayAddress.type === 'BILLING' ? 'business' : 'location'} 
+                            size={16} 
+                            color={theme.colors.primary[600]} 
+                          />
                         </View>
-                      )}
+                        <Text style={styles.addressTypeLabel}>
+                          {displayAddress.type === 'SHIPPING' ? 'Home' : displayAddress.type === 'BILLING' ? 'Work' : 'Other'}
+                        </Text>
+                        {displayAddress.isDefault && (
+                          <View style={styles.defaultBadge}>
+                            <Text style={styles.defaultBadgeText}>Default</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
-                    <Text style={styles.addressText}>
-                      {displayAddress.street}
-                    </Text>
-                    <Text style={styles.addressText}>
-                      {displayAddress.city}, {displayAddress.state} {displayAddress.zipCode}
-                    </Text>
-                    <Text style={styles.addressText}>
-                      {displayAddress.country}
-                    </Text>
+                    <View style={styles.addressDetails}>
+                      <Text style={styles.addressText}>{displayAddress.street}</Text>
+                      <Text style={styles.addressText}>
+                        {displayAddress.city}, {displayAddress.state} {displayAddress.zipCode}
+                      </Text>
+                      <Text style={styles.addressText}>{displayAddress.country}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.selectedIndicator}>
+                    <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
                   </View>
                 </View>
               )}
@@ -275,58 +409,40 @@ export default function CheckoutScreen() {
               {/* Address Selection Button */}
               {addresses.length > 1 && (
                 <TouchableOpacity
-                  style={styles.selectAddressButton}
+                  style={styles.changeAddressButton}
                   onPress={showBottomSheet}
                 >
-                  <View style={styles.selectAddressButtonContent}>
-                    <Ionicons name="location" size={20} color={theme.colors.primary[600]} />
-                    <Text style={styles.selectAddressButtonText}>Select Different Address</Text>
-                  </View>
-                  <Ionicons name="chevron-down" size={20} color={theme.colors.primary[600]} />
+                  <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary[600]} />
+                  <Text style={styles.changeAddressButtonText}>Change Address</Text>
+                  <Ionicons name="chevron-down" size={16} color={theme.colors.primary[600]} />
                 </TouchableOpacity>
               )}
             </View>
           )}
         </View>
 
-        {/* Payment Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentMethods}>
-            <TouchableOpacity
-              style={[styles.paymentMethod, paymentMethod === 'credit' && styles.selectedPayment]}
-              onPress={() => setPaymentMethod('credit')}
-            >
-              <Ionicons name="card" size={24} color={theme.colors.primary[600]} />
-              <Text style={styles.paymentText}>Credit Card</Text>
-              {paymentMethod === 'credit' && (
-                <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
-              )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.paymentMethod, paymentMethod === 'paypal' && styles.selectedPayment]}
-              onPress={() => setPaymentMethod('paypal')}
-            >
-              <Ionicons name="logo-paypal" size={24} color={theme.colors.primary[600]} />
-              <Text style={styles.paymentText}>PayPal</Text>
-              {paymentMethod === 'paypal' && (
-                <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
-              )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.paymentMethod, paymentMethod === 'apple' && styles.selectedPayment]}
-              onPress={() => setPaymentMethod('apple')}
-            >
-              <Ionicons name="logo-apple" size={24} color={theme.colors.primary[600]} />
-              <Text style={styles.paymentText}>Apple Pay</Text>
-              {paymentMethod === 'apple' && (
-                <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
-              )}
-            </TouchableOpacity>
+        {/* Payment Method Selection Card */}
+        <View style={styles.paymentCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
+            </View>
+            <Text style={styles.cardTitle}>Payment Method</Text>
+          </View>
+
+          <View style={styles.paymentMethodsList}>
+            {paymentMethods.map(renderPaymentMethod)}
+          </View>
+
+          {/* Security Note */}
+          <View style={styles.securityNote}>
+            <Ionicons name="shield-checkmark" size={20} color={theme.colors.success[600]} />
+            <Text style={styles.securityText}>
+              Your payment information is encrypted and secure
+            </Text>
           </View>
         </View>
+
       </ScrollView>
 
       {/* Address Selection Bottom Sheet */}
@@ -392,16 +508,16 @@ export default function CheckoutScreen() {
       )}
 
       {/* Add Address Modal */}
-              <AddAddressModal
-          visible={showAddAddressModal}
-          onSuccess={handleAddNewAddress}
-          onClose={() => setShowAddAddressModal(false)}
-        />
+      <AddAddressModal
+        visible={showAddAddressModal}
+        onSuccess={handleAddNewAddress}
+        onClose={() => setShowAddAddressModal(false)}
+      />
 
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          title={loading ? 'Processing...' : 'Proceed to Payment'}
+          title={loading ? 'Processing...' : selectedPaymentMethod === 'cod' ? `Place Order - $${finalTotal.toFixed(2)}` : `Pay $${finalTotal.toFixed(2)}`}
           onPress={handleProceedToPayment}
           disabled={loading}
           variant="primary"
@@ -416,11 +532,11 @@ export default function CheckoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.surface,
   },
   content: {
     flex: 1,
-    padding: theme.spacing.xl,
+    padding: theme.spacing.md,
   },
   section: {
     marginBottom: theme.spacing.xl,
@@ -439,12 +555,12 @@ const styles = StyleSheet.create({
   addAddressButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.primary[50],
+    backgroundColor: theme.colors.gray[50],
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.primary[200],
+    borderColor: theme.colors.gray[200],
   },
   addAddressText: {
     fontSize: theme.typography.sizes.sm,
@@ -514,8 +630,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.xl,
     backgroundColor: theme.colors.gray[50],
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 2,
     borderColor: theme.colors.gray[200],
     borderStyle: 'dashed',
   },
@@ -535,9 +651,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[50],
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.primary[200],
+    shadowColor: theme.colors.primary[100],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   addFirstAddressText: {
     fontSize: theme.typography.sizes.sm,
@@ -555,15 +676,6 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
-  },
-  addressTypeContainer: {
-    marginTop: theme.spacing.sm,
-  },
-  addressTypeLabel: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: '500',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
   },
   addressTypeOptions: {
     flexDirection: 'row',
@@ -589,86 +701,8 @@ const styles = StyleSheet.create({
   selectedAddressTypeText: {
     color: theme.colors.primary[600],
   },
-  orderItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[200],
-  },
-  itemName: {
-    flex: 1,
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-  },
-  itemQuantity: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    marginRight: theme.spacing.md,
-  },
-  itemPrice: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  orderSummary: {
-    marginTop: theme.spacing.lg,
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.gray[50],
-    borderRadius: theme.borderRadius.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.secondary,
-  },
-  summaryValue: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.gray[200],
-    paddingTop: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-  },
-  totalLabel: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  totalValue: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '700',
-    color: theme.colors.primary[600],
-  },
-  paymentMethods: {
-    gap: theme.spacing.md,
-  },
-  paymentMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.gray[200],
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface,
-  },
-  selectedPayment: {
-    borderColor: theme.colors.primary[600],
-    backgroundColor: theme.colors.primary[50],
-  },
-  paymentText: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-    marginLeft: theme.spacing.md,
-    flex: 1,
-  },
+  // Order item and summary styles moved to OrderSummary component
+
   footer: {
     padding: theme.spacing.xl,
     backgroundColor: theme.colors.surface,
@@ -749,27 +783,36 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.gray[200],
+    marginBottom: theme.spacing.md,
   },
-  selectAddressButton: {
+  addressTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addressTypeLabel: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  selectedIndicator: {
+    marginLeft: theme.spacing.sm,
+  },
+  changeAddressButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.lg,
     backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.primary[200],
   },
-  selectAddressButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  selectAddressButtonText: {
+  changeAddressButtonText: {
     fontSize: theme.typography.sizes.base,
     color: theme.colors.primary[600],
     fontWeight: '500',
-    marginRight: theme.spacing.sm,
+    marginHorizontal: theme.spacing.sm,
   },
   addNewAddressButton: {
     flexDirection: 'row',
@@ -843,4 +886,221 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: theme.spacing.sm,
   },
+  
+  // New Card-based Design Styles
+  // orderCard styles moved to OrderSummary component
+  addressCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  paymentCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  cardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  cardTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
+  itemCountBadge: {
+    backgroundColor: theme.colors.primary[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+  },
+  itemCountText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.primary[700],
+    fontWeight: '600',
+  },
+  // orderItems styles moved to OrderSummary component
+  itemInfo: {
+    flex: 1,
+  },
+  shippingContainer: {
+    alignItems: 'flex-end',
+  },
+  freeShipping: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.success[600],
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[300],
+    marginVertical: theme.spacing.md,
+  },
+  emptyStateIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.borderRadius.xl,
+    backgroundColor: theme.colors.gray[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  addressTypeIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  addressDetails: {
+    marginTop: theme.spacing.sm,
+  },
+  newAddressTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  
+  // Order Item Redesign Styles moved to OrderSummary component
+  
+  // Order summary styles moved to OrderSummary component
+
+  // Payment Method Styles
+  paymentMethodsList: {
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  paymentMethodCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
+    padding: theme.spacing.lg,
+  },
+  selectedPaymentMethod: {
+    borderColor: theme.colors.primary[600],
+    backgroundColor: theme.colors.primary[50],
+  },
+  disabledPaymentMethod: {
+    opacity: 0.5,
+  },
+  paymentMethodContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  paymentMethodLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paymentMethodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.gray[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  selectedPaymentMethodIcon: {
+    backgroundColor: theme.colors.primary[100],
+  },
+  paymentMethodText: {
+    flex: 1,
+  },
+  paymentMethodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  paymentMethodName: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  selectedPaymentMethodName: {
+    color: theme.colors.primary[700],
+  },
+  paymentMethodSubtitle: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+  },
+  disabledText: {
+    color: theme.colors.gray[400],
+  },
+  recommendedBadge: {
+    backgroundColor: theme.colors.success[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  recommendedText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: theme.colors.success[700],
+  },
+  comingSoonBadge: {
+    backgroundColor: theme.colors.gray[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  comingSoonText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: theme.colors.gray[600],
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.gray[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedRadioButton: {
+    borderColor: theme.colors.primary[600],
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.primary[600],
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.success[50],
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success[200],
+  },
+  securityText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.success[700],
+    marginLeft: theme.spacing.sm,
+  },
+
 }); 

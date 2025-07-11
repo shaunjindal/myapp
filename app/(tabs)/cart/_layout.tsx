@@ -17,9 +17,17 @@ export default function CartLayout() {
       return;
     }
     
-    // If we're on checkout page, always go back to cart
+    // If we're on checkout page, go back to cart (replace to avoid navigation loop)
     if (currentSegment === 'checkout') {
-      router.push('/(tabs)/cart');
+      router.replace('/(tabs)/cart');
+      return;
+    }
+    
+    // If we're on payment processing online page, go back to checkout
+    if (currentSegment === 'payment-processing-online') {
+      // Note: Payment processing screen handles its own back button logic
+      // through hardware back button handler to prevent navigation during processing
+      router.back();
       return;
     }
     
@@ -27,7 +35,7 @@ export default function CartLayout() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.push('/(tabs)/cart');
+      router.replace('/(tabs)/home');
     }
   };
 
@@ -67,6 +75,15 @@ export default function CartLayout() {
           headerLeft: () => null,
           headerBackVisible: false,
           gestureEnabled: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="payment-processing-online" 
+        options={{ 
+          title: 'Payment Processing',
+          headerLeft: () => <BackButton />,
+          headerBackVisible: false,
+          gestureEnabled: true,
         }} 
       />
       <Stack.Screen 

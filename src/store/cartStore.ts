@@ -51,6 +51,10 @@ const convertApiCartToFrontend = (apiCart: any) => {
       inStock: true,
       featured: false,
       salePrice: item.unitPrice,
+      brand: item.productBrand || 'Unknown', // Add brand field
+      stockQuantity: item.stockQuantity || 999, // Set reasonable default stock
+      originalPrice: item.unitPrice,
+      specifications: {},
     },
     quantity: item.quantity || 0,
   }));

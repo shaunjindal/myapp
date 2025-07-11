@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useOrderStore } from '../../../src/store/orderStore';
+import { OrderDetailsOrderSummary } from '../../../src/components/OrderDetailsOrderSummary';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -231,78 +232,16 @@ export default function OrderDetailsScreen() {
     </View>
   );
 
-  const renderOrderItems = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Items Ordered</Text>
-      {(order?.items || []).map((item, index) => (
-        <View key={item.id} style={styles.itemCard}>
-          <View style={styles.itemHeader}>
-            <Image 
-              source={{ uri: item.productImageUrl || 'https://via.placeholder.com/60' }} 
-              style={styles.itemImage} 
-            />
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.productName}</Text>
-              {item.productBrand && (
-                <Text style={styles.itemBrand}>{item.productBrand}</Text>
-              )}
-              <Text style={styles.itemSku}>SKU: {item.productSku}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.itemPricingContainer}>
-            <View style={styles.pricingRow}>
-              <View style={styles.pricingItem}>
-                <Text style={styles.pricingLabel}>Unit Price</Text>
-                <Text style={styles.pricingValue}>${item.unitPrice?.toFixed(2)}</Text>
-              </View>
-              
-              <View style={styles.pricingItem}>
-                <Text style={styles.pricingLabel}>Quantity</Text>
-                <Text style={styles.pricingValue}>{item.quantity}</Text>
-              </View>
-              
-              <View style={styles.pricingItem}>
-                <Text style={styles.pricingLabel}>Total</Text>
-                <Text style={styles.totalPrice}>${item.totalPrice?.toFixed(2)}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-
   const renderOrderSummary = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Order Summary</Text>
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Subtotal</Text>
-          <Text style={styles.summaryValue}>${order?.subtotal?.toFixed(2)}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Shipping</Text>
-          <Text style={styles.summaryValue}>${order?.shippingAmount?.toFixed(2)}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tax</Text>
-          <Text style={styles.summaryValue}>${order?.taxAmount?.toFixed(2)}</Text>
-        </View>
-        {(order?.discountAmount || 0) > 0 && (
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Discount</Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.success[600] }]}>
-              -${order?.discountAmount?.toFixed(2)}
-            </Text>
-          </View>
-        )}
-        <View style={[styles.summaryRow, styles.totalRow]}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>${order?.totalAmount?.toFixed(2)}</Text>
-        </View>
-      </View>
-    </View>
+    <OrderDetailsOrderSummary
+      items={order?.items || []}
+      subtotal={order?.subtotal || 0}
+      shippingAmount={order?.shippingAmount || 0}
+      taxAmount={order?.taxAmount || 0}
+      discountAmount={order?.discountAmount || 0}
+      totalAmount={order?.totalAmount || 0}
+      style={styles.orderSummaryCard}
+    />
   );
 
   const renderShippingInfo = () => (
@@ -402,7 +341,6 @@ export default function OrderDetailsScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {renderOrderHeader()}
         {renderOrderStatusTracker()}
-        {renderOrderItems()}
         {renderOrderSummary()}
         {renderShippingInfo()}
         {renderPaymentInfo()}
@@ -419,6 +357,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     padding: theme.spacing.lg,
+  },
+  orderSummaryCard: {
+    marginBottom: theme.spacing.lg,
   },
   loadingContainer: {
     flex: 1,
@@ -518,107 +459,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
-  itemCard: {
-    backgroundColor: theme.colors.gray[50],
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.gray[200],
-    marginBottom: theme.spacing.lg,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: theme.colors.gray[200],
-  },
-  itemInfo: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
-  },
-  itemName: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  itemBrand: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  itemSku: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.sm,
-  },
-  itemPricingContainer: {
-    paddingTop: theme.spacing.sm,
-  },
-  pricingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-  },
-  pricingItem: {
-    flexDirection: 'column',
-  },
-  pricingLabel: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-    fontWeight: '500',
-  },
-  pricingValue: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-    fontWeight: '500',
-  },
-  totalPrice: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '700',
-    color: theme.colors.success[600],
-  },
-  summaryContainer: {
-    paddingTop: theme.spacing.sm,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.secondary,
-  },
-  summaryValue: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.text.primary,
-    fontWeight: '500',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.gray[200],
-    paddingTop: theme.spacing.md,
-    marginTop: theme.spacing.sm,
-  },
-  totalLabel: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  totalValue: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '700',
-    color: theme.colors.primary[600],
-  },
+
+
   infoContainer: {
     gap: theme.spacing.lg,
   },

@@ -55,7 +55,17 @@ public enum PaymentMethod {
     /**
      * Store credit
      */
-    STORE_CREDIT("Store Credit");
+    STORE_CREDIT("Store Credit"),
+    
+    /**
+     * Razorpay card payment (Credit/Debit cards)
+     */
+    RAZORPAY_CARD("Razorpay Card"),
+    
+    /**
+     * Razorpay UPI payment
+     */
+    RAZORPAY_UPI("Razorpay UPI");
     
     private final String displayName;
     
@@ -78,7 +88,9 @@ public enum PaymentMethod {
                this == APPLE_PAY || 
                this == GOOGLE_PAY || 
                this == DIGITAL_WALLET || 
-               this == CRYPTOCURRENCY;
+               this == CRYPTOCURRENCY ||
+               this == RAZORPAY_CARD ||
+               this == RAZORPAY_UPI;
     }
     
     /**
@@ -116,6 +128,8 @@ public enum PaymentMethod {
             case APPLE_PAY, GOOGLE_PAY -> 0.025; // 2.5%
             case CRYPTOCURRENCY -> 0.015; // 1.5%
             case BANK_TRANSFER -> 0.005; // 0.5%
+            case RAZORPAY_CARD -> 0.0236; // 2.36% (Razorpay card fee)
+            case RAZORPAY_UPI -> 0.0; // No fee for UPI
             case CASH_ON_DELIVERY, STORE_CREDIT, DIGITAL_WALLET -> 0.0; // No fee
         };
     }

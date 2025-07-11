@@ -19,6 +19,8 @@ export enum PaymentMethod {
   GOOGLE_PAY = 'GOOGLE_PAY',
   BANK_TRANSFER = 'BANK_TRANSFER',
   CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
+  RAZORPAY_CARD = 'RAZORPAY_CARD',
+  RAZORPAY_UPI = 'RAZORPAY_UPI',
 }
 
 export interface CreateOrderRequest {
