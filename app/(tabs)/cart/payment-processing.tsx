@@ -141,9 +141,9 @@ export default function PaymentProcessingScreen() {
 
           createdOrder = await orderService.createOrderFromCart(orderRequest);
           
-          // Now initiate payment with the real order ID
+          // Now initiate payment with the real order ID using the order's total amount
           const paymentResult = await initiatePayment({
-            amount: total,
+            amount: createdOrder.totalAmount || total,
             currency: 'INR',
             orderId: createdOrder.id,
             name: 'E-Commerce App',

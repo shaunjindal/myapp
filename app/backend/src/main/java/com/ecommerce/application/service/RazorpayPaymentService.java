@@ -4,6 +4,7 @@ import com.ecommerce.application.dto.PaymentOrderRequest;
 import com.ecommerce.application.dto.PaymentOrderResponse;
 import com.ecommerce.application.dto.PaymentVerificationRequest;
 import com.ecommerce.application.dto.PaymentVerificationResponse;
+import com.ecommerce.application.dto.RefundResponse;
 import com.ecommerce.config.RazorpayConfig;
 import com.ecommerce.domain.order.PaymentMethod;
 import com.ecommerce.domain.payment.Payment;
@@ -33,6 +34,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Date;
 
 /**
  * Service class for Razorpay payment operations
@@ -112,6 +114,9 @@ public class RazorpayPaymentService {
             orderRequest.put("currency", request.getCurrency());
             orderRequest.put("receipt", request.getReceipt() != null ? request.getReceipt() : order.getOrderNumber());
             
+            // Add payment capture settings
+            orderRequest.put("payment_capture", razorpayConfig.isAutoCapture());
+            
             com.razorpay.Order razorpayOrder = razorpayClient.orders.create(orderRequest);
             
             // Create payment record in database
@@ -125,7 +130,7 @@ public class RazorpayPaymentService {
             response.setCurrency(razorpayOrder.get("currency"));
             response.setReceipt(razorpayOrder.get("receipt"));
             response.setStatus(razorpayOrder.get("status"));
-            response.setCreatedAt(Long.valueOf(razorpayOrder.get("created_at").toString()));
+            response.setCreatedAt(razorpayOrder.get("created_at"));
             response.setKeyId(razorpayConfig.getKeyId());
             
             logger.info("Successfully created Razorpay order: {}", response.getOrderId());
@@ -172,6 +177,9 @@ public class RazorpayPaymentService {
             orderRequest.put("currency", request.getCurrency());
             orderRequest.put("receipt", request.getReceipt() != null ? request.getReceipt() : "temp_receipt_" + System.currentTimeMillis());
             
+            // Add payment capture settings
+            orderRequest.put("payment_capture", razorpayConfig.isAutoCapture());
+            
             com.razorpay.Order razorpayOrder = razorpayClient.orders.create(orderRequest);
             
             // Create payment record in database without order reference
@@ -185,7 +193,7 @@ public class RazorpayPaymentService {
             response.setCurrency(razorpayOrder.get("currency"));
             response.setReceipt(razorpayOrder.get("receipt"));
             response.setStatus(razorpayOrder.get("status"));
-            response.setCreatedAt(Long.valueOf(razorpayOrder.get("created_at").toString()));
+            response.setCreatedAt(razorpayOrder.get("created_at").toString());
             response.setKeyId(razorpayConfig.getKeyId());
             
             logger.info("Successfully created Razorpay order without existing order: {}", response.getOrderId());
@@ -257,7 +265,7 @@ public class RazorpayPaymentService {
         
         // Create mock order data
         String orderId = "order_mock_" + System.currentTimeMillis();
-        long createdAt = System.currentTimeMillis() / 1000;
+        String createdAt = new Date().toString();
         String receipt = request.getReceipt() != null ? request.getReceipt() : order.getOrderNumber();
         
         // Create payment record in database with mock data
@@ -298,7 +306,7 @@ public class RazorpayPaymentService {
         
         // Create mock order data
         String orderId = "order_mock_" + System.currentTimeMillis();
-        long createdAt = System.currentTimeMillis() / 1000;
+        String createdAt = new Date().toString();
         String receipt = request.getReceipt() != null ? request.getReceipt() : "temp_receipt_" + System.currentTimeMillis();
         
         // Create payment record in database with mock data (without order reference)
@@ -308,7 +316,7 @@ public class RazorpayPaymentService {
         payment.setAmount(request.getAmount());
         payment.setCurrency(request.getCurrency());
         payment.setStatus(PaymentStatus.CREATED);
-        payment.setPaymentMethod(PaymentMethod.RAZORPAY_CARD);
+        payment.setPaymentMethod(PaymentMethod.RAZORPAY_CARD); // Default, can be updated based on actual payment method
         payment.setUser(user);
         // Note: No order reference for payment-first flow
         payment.setReceipt(receipt);
@@ -438,5 +446,300 @@ public class RazorpayPaymentService {
     @Transactional(readOnly = true)
     public Optional<PaymentJpaEntity> getPaymentByRazorpayOrderId(String razorpayOrderId) {
         return paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+    }
+
+    /**
+     * Processes Razorpay webhook notifications
+     * 
+     * @param payload the webhook payload from Razorpay
+     * @param signature the webhook signature for verification
+     * @return true if webhook was processed successfully, false otherwise
+     */
+    public boolean processWebhook(String payload, String signature) {
+        try {
+            logger.info("Processing Razorpay webhook notification");
+            
+            // Skip signature verification for dummy credentials
+            if (!razorpayConfig.isDummyCredentials()) {
+                // Verify webhook signature
+                if (!verifyWebhookSignature(payload, signature)) {
+                    logger.warn("Invalid webhook signature");
+                    return false;
+                }
+            } else {
+                logger.info("Skipping webhook signature verification for dummy credentials");
+            }
+            
+            // Parse webhook payload
+            JSONObject webhookData = new JSONObject(payload);
+            String event = webhookData.getString("event");
+            JSONObject paymentData = webhookData.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
+            
+            logger.info("Processing webhook event: {}", event);
+            
+            // Handle different webhook events
+            switch (event) {
+                case "payment.captured":
+                    return handlePaymentCaptured(paymentData);
+                case "payment.failed":
+                    return handlePaymentFailed(paymentData);
+                case "payment.authorized":
+                    return handlePaymentAuthorized(paymentData);
+                default:
+                    logger.info("Unhandled webhook event: {}", event);
+                    return true; // Return true for unknown events to avoid retries
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error processing webhook: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Handles payment captured webhook event
+     */
+    private boolean handlePaymentCaptured(JSONObject paymentData) {
+        try {
+            String razorpayPaymentId = paymentData.getString("id");
+            String razorpayOrderId = paymentData.getString("order_id");
+            
+            logger.info("Handling payment captured event: payment_id={}, order_id={}", razorpayPaymentId, razorpayOrderId);
+            
+            // Find payment by Razorpay order ID
+            Optional<PaymentJpaEntity> paymentOpt = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+            if (paymentOpt.isEmpty()) {
+                logger.warn("Payment not found for Razorpay order ID: {}", razorpayOrderId);
+                return false;
+            }
+            
+            PaymentJpaEntity payment = paymentOpt.get();
+            
+            // Update payment status
+            payment.setStatus(PaymentStatus.PAID);
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            payment.setPaidAt(java.time.LocalDateTime.now());
+            paymentRepository.save(payment);
+            
+            // Update order status if order exists
+            if (payment.getOrder() != null) {
+                OrderJpaEntity order = payment.getOrder();
+                order.setStatus(com.ecommerce.domain.order.OrderStatus.PAYMENT_DONE);
+                orderRepository.save(order);
+                logger.info("Updated order status to PAYMENT_DONE for order: {}", order.getOrderNumber());
+            }
+            
+            logger.info("Successfully processed payment captured event");
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error handling payment captured event: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Handles payment failed webhook event
+     */
+    private boolean handlePaymentFailed(JSONObject paymentData) {
+        try {
+            String razorpayPaymentId = paymentData.getString("id");
+            String razorpayOrderId = paymentData.getString("order_id");
+            String errorCode = paymentData.optString("error_code", "");
+            String errorDescription = paymentData.optString("error_description", "");
+            
+            logger.info("Handling payment failed event: payment_id={}, order_id={}", razorpayPaymentId, razorpayOrderId);
+            
+            // Find payment by Razorpay order ID
+            Optional<PaymentJpaEntity> paymentOpt = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+            if (paymentOpt.isEmpty()) {
+                logger.warn("Payment not found for Razorpay order ID: {}", razorpayOrderId);
+                return false;
+            }
+            
+            PaymentJpaEntity payment = paymentOpt.get();
+            
+            // Update payment status
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            payment.setErrorCode(errorCode);
+            payment.setErrorDescription(errorDescription);
+            payment.setFailedAt(java.time.LocalDateTime.now());
+            paymentRepository.save(payment);
+            
+            // Update order status if order exists
+            if (payment.getOrder() != null) {
+                OrderJpaEntity order = payment.getOrder();
+                order.setStatus(com.ecommerce.domain.order.OrderStatus.CANCELLED);
+                orderRepository.save(order);
+                logger.info("Updated order status to CANCELLED for order: {}", order.getOrderNumber());
+            }
+            
+            logger.info("Successfully processed payment failed event");
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error handling payment failed event: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Handles payment authorized webhook event
+     */
+    private boolean handlePaymentAuthorized(JSONObject paymentData) {
+        try {
+            String razorpayPaymentId = paymentData.getString("id");
+            String razorpayOrderId = paymentData.getString("order_id");
+            
+            logger.info("Handling payment authorized event: payment_id={}, order_id={}", razorpayPaymentId, razorpayOrderId);
+            
+            // Find payment by Razorpay order ID
+            Optional<PaymentJpaEntity> paymentOpt = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+            if (paymentOpt.isEmpty()) {
+                logger.warn("Payment not found for Razorpay order ID: {}", razorpayOrderId);
+                return false;
+            }
+            
+            PaymentJpaEntity payment = paymentOpt.get();
+            
+            // Update payment status
+            payment.setStatus(PaymentStatus.AUTHORIZED);
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            paymentRepository.save(payment);
+            
+            logger.info("Successfully processed payment authorized event");
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error handling payment authorized event: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Verifies webhook signature
+     */
+    private boolean verifyWebhookSignature(String payload, String signature) {
+        try {
+            if (signature == null || signature.isEmpty()) {
+                logger.warn("No webhook signature provided");
+                return false;
+            }
+            
+            String expectedSignature = calculateHMAC(payload, razorpayConfig.getWebhookSecret());
+            return expectedSignature.equals(signature);
+            
+        } catch (Exception e) {
+            logger.error("Error verifying webhook signature: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Processes a refund for a payment
+     * 
+     * @param paymentId the payment ID to refund
+     * @param refundAmount the amount to refund (optional, full refund if null)
+     * @param reason the reason for refund (optional)
+     * @return refund details
+     */
+    public RefundResponse processRefund(String paymentId, BigDecimal refundAmount, String reason) {
+        try {
+            logger.info("Processing refund for payment: {}, amount: {}", paymentId, refundAmount);
+            
+            // Find payment by payment ID
+            Optional<PaymentJpaEntity> paymentOpt = paymentRepository.findByPaymentId(paymentId);
+            if (paymentOpt.isEmpty()) {
+                logger.warn("Payment not found for payment ID: {}", paymentId);
+                return RefundResponse.failure("Payment not found");
+            }
+            
+            PaymentJpaEntity payment = paymentOpt.get();
+            
+            // Validate payment status
+            if (!payment.getStatus().isSuccessful()) {
+                logger.warn("Cannot refund payment with status: {}", payment.getStatus());
+                return RefundResponse.failure("Payment is not in a refundable state");
+            }
+            
+            // Use full payment amount if refund amount not specified
+            BigDecimal finalRefundAmount = refundAmount != null ? refundAmount : payment.getAmount();
+            
+            // Validate refund amount
+            if (finalRefundAmount.compareTo(payment.getAmount()) > 0) {
+                logger.warn("Refund amount {} exceeds payment amount {}", finalRefundAmount, payment.getAmount());
+                return RefundResponse.failure("Refund amount exceeds payment amount");
+            }
+            
+            // Check if using dummy credentials and return mock response
+            if (razorpayConfig.isDummyCredentials()) {
+                logger.info("Using dummy credentials - returning mock refund response");
+                return createMockRefundResponse(payment, finalRefundAmount, reason);
+            }
+            
+            // Process refund through Razorpay API
+            JSONObject refundRequest = new JSONObject();
+            refundRequest.put("amount", finalRefundAmount.multiply(new BigDecimal("100")).intValue()); // Convert to paise
+            refundRequest.put("payment_id", payment.getRazorpayPaymentId());
+            if (reason != null && !reason.trim().isEmpty()) {
+                refundRequest.put("notes", new JSONObject().put("reason", reason));
+            }
+            
+            // Create refund using Razorpay client
+            com.razorpay.Refund refund = razorpayClient.refunds.create(refundRequest);
+            
+            // Update payment status
+            String refundId = (String) refund.get("id");
+            updatePaymentRefundStatus(payment, finalRefundAmount, refundId);
+            
+            logger.info("Successfully processed refund: {}", refundId);
+            return RefundResponse.success(
+                refundId,
+                finalRefundAmount,
+                (String) refund.get("status")
+            );
+            
+        } catch (Exception e) {
+            logger.error("Error processing refund: {}", e.getMessage(), e);
+            return RefundResponse.error("Error processing refund: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Creates a mock refund response for development
+     */
+    private RefundResponse createMockRefundResponse(PaymentJpaEntity payment, BigDecimal refundAmount, String reason) {
+        logger.info("Creating mock refund response for development");
+        
+        String refundId = "rfnd_mock_" + System.currentTimeMillis();
+        
+        // Update payment status
+        updatePaymentRefundStatus(payment, refundAmount, refundId);
+        
+        return RefundResponse.success(refundId, refundAmount, "processed");
+    }
+
+    /**
+     * Updates payment refund status
+     */
+    private void updatePaymentRefundStatus(PaymentJpaEntity payment, BigDecimal refundAmount, String refundId) {
+        BigDecimal totalRefunded = payment.getRefundAmount() != null ? payment.getRefundAmount() : BigDecimal.ZERO;
+        totalRefunded = totalRefunded.add(refundAmount);
+        
+        payment.setRefundAmount(totalRefunded);
+        payment.setRefundId(refundId);
+        payment.setRefundedAt(java.time.LocalDateTime.now());
+        
+        // Update payment status based on refund amount
+        if (totalRefunded.compareTo(payment.getAmount()) >= 0) {
+            payment.setStatus(PaymentStatus.REFUNDED);
+        } else {
+            payment.setStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        }
+        
+        paymentRepository.save(payment);
+        logger.info("Updated payment refund status: payment_id={}, refund_amount={}, total_refunded={}", 
+                   payment.getPaymentId(), refundAmount, totalRefunded);
     }
 } 

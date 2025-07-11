@@ -101,6 +101,7 @@ export interface PaymentResult {
 
 export interface UseRazorpayPaymentReturn {
   isLoading: boolean;
+  isTestMode: boolean;
   initiatePayment: (options: RazorpayPaymentOptions) => Promise<PaymentResult>;
   verifyPayment: (verificationData: PaymentVerificationRequest) => Promise<PaymentVerificationResponse>;
   resetLoading: () => void;
@@ -108,6 +109,7 @@ export interface UseRazorpayPaymentReturn {
 
 export const useRazorpayPayment = (): UseRazorpayPaymentReturn => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(false);
   const { user } = useAuthStore();
 
   const initiatePayment = async (options: RazorpayPaymentOptions): Promise<PaymentResult> => {
@@ -136,6 +138,15 @@ export const useRazorpayPayment = (): UseRazorpayPaymentReturn => {
       );
       console.log('✅ Backend payment order created:', paymentOrder);
 
+      // Detect test mode based on key ID
+      const isTestModeDetected = paymentOrder.keyId?.startsWith('rzp_test_') || paymentOrder.keyId?.includes('dummy');
+      setIsTestMode(isTestModeDetected);
+
+      // Show test mode alert if in test mode
+      if (isTestModeDetected) {
+        console.log('⚠️ Running in TEST MODE - No real money will be charged');
+      }
+
       // Step 2: Prepare Razorpay options
       const razorpayOptions = {
         description: options.description || 'Payment for your order',
@@ -147,7 +158,7 @@ export const useRazorpayPayment = (): UseRazorpayPaymentReturn => {
         name: options.name || 'E-Commerce App',
         prefill: {
           email: options.email || user.email || '',
-          contact: options.contact || '9999999999',
+          contact: options.contact || '+919876543210', // Valid Indian mobile number format
           name: user.name || '',
         },
         theme: {
@@ -274,6 +285,7 @@ export const useRazorpayPayment = (): UseRazorpayPaymentReturn => {
 
   return {
     isLoading,
+    isTestMode,
     initiatePayment,
     verifyPayment,
     resetLoading,

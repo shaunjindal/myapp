@@ -30,6 +30,22 @@ const generateSessionId = (): string => {
   return `${timestamp}-${random}`;
 };
 
+// Calculate totals from items
+const calculateTotals = (items: CartItem[]) => {
+  const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const tax = subtotal * 0.08; // 8% tax
+  const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
+  const finalTotal = subtotal + tax + shipping;
+  
+  return {
+    total: subtotal, // Keep legacy total for backward compatibility
+    subtotal,
+    tax,
+    shipping,
+    finalTotal,
+  };
+};
+
 // Helper function to convert API cart to frontend format
 const convertApiCartToFrontend = (apiCart: any) => {
   const items: CartItem[] = (apiCart.items || []).map((item: any) => ({
@@ -59,9 +75,11 @@ const convertApiCartToFrontend = (apiCart: any) => {
     quantity: item.quantity || 0,
   }));
   
+  const totals = calculateTotals(items);
+  
   return {
     items,
-    total: apiCart.totalAmount || 0,
+    ...totals,
     cartId: apiCart.id,
     itemCount: apiCart.totalItems || 0,
     discountAmount: apiCart.discountAmount || 0,
@@ -76,6 +94,12 @@ export interface CartStoreState extends CartState {
   cartId: string | null;
   isGuest: boolean;
   lastSyncAt: Date | null;
+  
+  // Centralized total calculations
+  subtotal: number;
+  tax: number;
+  shipping: number;
+  finalTotal: number;
   
   // Cart persistence methods
   initializeCart: () => Promise<void>;
@@ -96,6 +120,10 @@ export const useCartStore = create<CartStoreState>()(
     (set, get) => ({
       items: [],
       total: 0,
+      subtotal: 0,
+      tax: 0,
+      shipping: 0,
+      finalTotal: 0,
       sessionId: null,
       deviceFingerprint: null,
       cartId: null,
@@ -122,11 +150,15 @@ export const useCartStore = create<CartStoreState>()(
           } else {
             // Get or create cart session
             const apiCart = await cartService.getCart();
-            const { items, total, cartId } = convertApiCartToFrontend(apiCart);
+            const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
             
             set({ 
               items, 
-              total, 
+              total,
+              subtotal,
+              tax,
+              shipping,
+              finalTotal,
               cartId,
               lastSyncAt: new Date(),
             });
@@ -158,7 +190,7 @@ export const useCartStore = create<CartStoreState>()(
             sessionInfo.deviceFingerprint
           );
           
-          const { items, total, cartId } = convertApiCartToFrontend(mergedCart);
+          const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(mergedCart);
           
           // Authenticate user in session manager
           await sessionManager.authenticateUser(userId);
@@ -167,6 +199,10 @@ export const useCartStore = create<CartStoreState>()(
           set({
             items,
             total,
+            subtotal,
+            tax,
+            shipping,
+            finalTotal,
             cartId,
             isGuest: false,
             lastSyncAt: new Date(),
@@ -191,12 +227,16 @@ export const useCartStore = create<CartStoreState>()(
         try {
           console.log('Syncing with server...');
           const apiCart = await cartService.getCart();
-          const { items, total, cartId } = convertApiCartToFrontend(apiCart);
+          const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
           
-          console.log('Server sync successful:', { items, total, cartId });
+          console.log('Server sync successful:', { items, total, subtotal, tax, shipping, finalTotal, cartId });
           set({
             items,
             total,
+            subtotal,
+            tax,
+            shipping,
+            finalTotal,
             cartId,
             lastSyncAt: new Date(),
           });
@@ -221,6 +261,10 @@ export const useCartStore = create<CartStoreState>()(
           set({
             items: [],
             total: 0,
+            subtotal: 0,
+            tax: 0,
+            shipping: 0,
+            finalTotal: 0,
             cartId: null,
             isGuest: true,
             lastSyncAt: null,
@@ -236,9 +280,9 @@ export const useCartStore = create<CartStoreState>()(
       addItemWithSession: async (product: Product, quantity: number = 1) => {
         try {
           const apiCart = await cartService.quickAddToCart(product.id, quantity);
-          const { items, total } = convertApiCartToFrontend(apiCart);
+          const { items, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
           
-          set({ items, total, lastSyncAt: new Date() });
+          set({ items, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(items.length);
         } catch (error) {
           console.error('Failed to add item to cart:', error);
@@ -252,13 +296,13 @@ export const useCartStore = create<CartStoreState>()(
                 ? { ...item, quantity: item.quantity + quantity }
                 : item
             );
-            const newTotal = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-            set({ items: updatedItems, total: newTotal });
+            const totals = calculateTotals(updatedItems);
+            set({ items: updatedItems, ...totals });
           } else {
             const newItem = { id: product.id, product, quantity };
             const updatedItems = [...items, newItem];
-            const newTotal = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-            set({ items: updatedItems, total: newTotal });
+            const totals = calculateTotals(updatedItems);
+            set({ items: updatedItems, ...totals });
           }
         }
       },
@@ -281,9 +325,9 @@ export const useCartStore = create<CartStoreState>()(
           
           // Use the item ID directly to avoid unnecessary GET call
           const apiCart = await cartService.updateCartItem(item.id, { quantity });
-          const { items: updatedItems, total } = convertApiCartToFrontend(apiCart);
+          const { items: updatedItems, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
           
-          set({ items: updatedItems, total, lastSyncAt: new Date() });
+          set({ items: updatedItems, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(updatedItems.length);
         } catch (error) {
           console.error('Failed to update item quantity:', error);
@@ -294,8 +338,8 @@ export const useCartStore = create<CartStoreState>()(
               ? { ...item, quantity }
               : item
           );
-          const newTotal = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          set({ items: updatedItems, total: newTotal });
+          const totals = calculateTotals(updatedItems);
+          set({ items: updatedItems, ...totals });
         }
       },
       
@@ -312,17 +356,17 @@ export const useCartStore = create<CartStoreState>()(
           
           // Use the item ID directly to avoid unnecessary GET call
           const apiCart = await cartService.removeFromCart(item.id);
-          const { items: updatedItems, total } = convertApiCartToFrontend(apiCart);
+          const { items: updatedItems, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
           
-          set({ items: updatedItems, total, lastSyncAt: new Date() });
+          set({ items: updatedItems, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(updatedItems.length);
         } catch (error) {
           console.error('Failed to remove item from cart:', error);
           // Fallback to local state
           const { items } = get();
           const updatedItems = items.filter(item => item.product.id !== productId);
-          const newTotal = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          set({ items: updatedItems, total: newTotal });
+          const totals = calculateTotals(updatedItems);
+          set({ items: updatedItems, ...totals });
         }
       },
       
@@ -333,12 +377,12 @@ export const useCartStore = create<CartStoreState>()(
           await cartService.clearCart();
           console.log('Cart cleared on backend');
           
-          set({ items: [], total: 0, lastSyncAt: new Date() });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(0);
         } catch (error) {
           console.error('Failed to clear cart:', error);
           // Still clear local state
-          set({ items: [], total: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
         }
       },
       
@@ -363,14 +407,14 @@ export const useCartStore = create<CartStoreState>()(
           console.log('Cart cleared on backend');
           
           // Update local state
-          set({ items: [], total: 0, lastSyncAt: new Date() });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0, lastSyncAt: new Date() });
           
           // Update session manager
           await sessionManager.updateCartActivity(0);
         } catch (error) {
           console.error('Failed to clear cart on backend:', error);
           // Still clear local state even if backend fails
-          set({ items: [], total: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
         }
       },
       
@@ -417,19 +461,23 @@ export const useCartStore = create<CartStoreState>()(
         try {
           console.log('Syncing cart from backend...');
           const apiCart = await cartService.getCart();
-          const { items, total, cartId } = convertApiCartToFrontend(apiCart);
+          const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
           
-          console.log('Cart synced successfully:', { items, total, cartId });
+          console.log('Cart synced successfully:', { items, total, subtotal, tax, shipping, finalTotal, cartId });
           set({
             items,
             total,
+            subtotal,
+            tax,
+            shipping,
+            finalTotal,
             cartId,
             lastSyncAt: new Date(),
           });
         } catch (error) {
           console.error('Failed to sync cart:', error);
           // If sync fails, just clear the cart
-          set({ items: [], total: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
         }
       },
     }),
@@ -446,6 +494,10 @@ export const useCartStore = create<CartStoreState>()(
           lastSyncAt: persistedState?.lastSyncAt || null,
           items: persistedState?.items || [],
           total: persistedState?.total || 0,
+          subtotal: persistedState?.subtotal || 0,
+          tax: persistedState?.tax || 0,
+          shipping: persistedState?.shipping || 0,
+          finalTotal: persistedState?.finalTotal || 0,
         };
       },
       // Persist cart items for guest users, session info for all users
@@ -458,6 +510,10 @@ export const useCartStore = create<CartStoreState>()(
         // Persist cart items for guest users to survive app restarts
         items: state.isGuest ? state.items : [],
         total: state.isGuest ? state.total : 0,
+        subtotal: state.isGuest ? state.subtotal : 0,
+        tax: state.isGuest ? state.tax : 0,
+        shipping: state.isGuest ? state.shipping : 0,
+        finalTotal: state.isGuest ? state.finalTotal : 0,
       }),
     }
   )

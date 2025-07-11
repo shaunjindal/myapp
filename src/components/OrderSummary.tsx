@@ -24,8 +24,6 @@ interface OrderSummaryItem {
 
 interface OrderSummaryProps {
   items: OrderSummaryItem[];
-  taxRate?: number; // Default to 8% (0.08)
-  shippingCost?: number; // Default to 0 (free shipping)
   showItems?: boolean;
   collapsible?: boolean;
   isExpanded?: boolean;
@@ -35,19 +33,14 @@ interface OrderSummaryProps {
 
 export function OrderSummary({
   items,
-  taxRate = 0.08,
-  shippingCost = 0,
   showItems = true,
   collapsible = false,
   isExpanded = true,
   onToggleExpanded,
   style,
 }: OrderSummaryProps) {
-  // Get total from cart store instead of calculating
-  const { total: subtotal } = useCartStore();
-  const tax = subtotal * taxRate;
-  const shipping = shippingCost;
-  const total = subtotal + tax + shipping;
+  // Get centralized totals from cart store
+  const { subtotal, tax, shipping, finalTotal } = useCartStore();
   
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -81,7 +74,7 @@ export function OrderSummary({
           <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
           <Text style={styles.collapsedTotalLabel}>Total Amount</Text>
         </View>
-        <Text style={styles.collapsedTotalValue}>${total.toFixed(2)}</Text>
+        <Text style={styles.collapsedTotalValue}>${finalTotal.toFixed(2)}</Text>
       </View>
     </View>
   );
@@ -131,7 +124,7 @@ export function OrderSummary({
           <View style={styles.summaryItem}>
             <View style={styles.summaryItemLeft}>
               <Ionicons name="receipt-outline" size={16} color={theme.colors.gray[500]} />
-              <Text style={styles.summaryLabel}>Tax ({(taxRate * 100).toFixed(0)}%)</Text>
+              <Text style={styles.summaryLabel}>Tax (8%)</Text>
             </View>
             <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
           </View>
@@ -164,7 +157,7 @@ export function OrderSummary({
               <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
               <Text style={styles.totalLabel}>Total Amount</Text>
             </View>
-            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
           </View>
         </View>
       </View>

@@ -16,7 +16,7 @@ public class PaymentOrderResponse {
     private String currency;
     private String receipt;
     private String status;
-    private Long createdAt;
+    private String createdAt;
     private String keyId;
     
     // Default constructor
@@ -79,11 +79,11 @@ public class PaymentOrderResponse {
         this.status = status;
     }
     
-    public Long getCreatedAt() {
+    public String getCreatedAt() {
         return createdAt;
     }
     
-    public void setCreatedAt(Long createdAt) {
+    public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
     }
     

@@ -75,10 +75,12 @@ jwt:
 
 # Razorpay Configuration
 razorpay:
-  key-id: ${RAZORPAY_KEY_ID:rzp_test_dummy_key_id}
-  key-secret: ${RAZORPAY_KEY_SECRET:dummy_key_secret}
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_0PGN9wmrofvBRY}
+  key-secret: ${RAZORPAY_KEY_SECRET:0WKdcp2BqaVLVsHJHJTWVACX}
   webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:dummy_webhook_secret}
   currency: INR
+  auto-capture: ${RAZORPAY_AUTO_CAPTURE:true}
+  capture-timeout-minutes: ${RAZORPAY_CAPTURE_TIMEOUT_MINUTES:5}
 
 management:
   endpoints:

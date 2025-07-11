@@ -23,6 +23,11 @@ public enum PaymentStatus {
     PAID("Paid"),
     
     /**
+     * Payment has been authorized but not yet captured
+     */
+    AUTHORIZED("Authorized"),
+    
+    /**
      * Payment has failed
      */
     FAILED("Failed"),

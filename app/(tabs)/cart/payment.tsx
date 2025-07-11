@@ -21,6 +21,7 @@ import { useRazorpayPayment } from '../../../src/hooks/useRazorpayPayment';
 import orderService from '../../../src/services/orderService';
 import { PaymentMethod } from '../../../src/types/order';
 import { Button } from '../../../src/components/Button';
+import { BackButtonHeader } from '../../../src/components/BackButtonHeader';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -29,11 +30,11 @@ export default function PaymentScreen() {
     paymentMethod: string;
   }>();
   
-  const { clearCart, items, total } = useCartStore();
+  const { clearCart, items, total, subtotal, tax, shipping, finalTotal } = useCartStore();
   const { user } = useAuthStore();
   const { addresses } = useAddressStore();
   const { addNewOrder } = useOrderStore();
-  const { initiatePayment, isLoading: isPaymentLoading, resetLoading } = useRazorpayPayment();
+  const { initiatePayment, isLoading: isPaymentLoading, resetLoading, isTestMode } = useRazorpayPayment();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +45,7 @@ export default function PaymentScreen() {
     signature: string;
   } | null>(null);
 
-  // Calculate order totals
-  const subtotal = total;
-  const tax = subtotal * 0.08; // 8% tax
-  const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
-  const finalTotal = subtotal + tax + shipping;
+  // Totals are now calculated centrally in useCartStore
 
   // Get selected address
   const selectedAddress = addresses.find(addr => addr.id === selectedAddressId);
@@ -280,115 +277,149 @@ export default function PaymentScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={80} color={theme.colors.error[600]} />
-            <Text style={styles.errorTitle}>Payment Failed</Text>
-            <Text style={styles.errorMessage}>{error}</Text>
-            <Button
-              title="Try Again"
-              onPress={() => {
-                setError(null);
-                setPaymentCollected(false);
-                setPaymentData(null);
-              }}
-              style={styles.retryButton}
-            />
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.backButtonText}>Go Back to Checkout</Text>
-            </TouchableOpacity>
+        <BackButtonHeader
+          title="Payment"
+          onBack={() => router.back()}
+        />
+        
+        {/* Test Mode Banner */}
+        {isTestMode && (
+          <View style={styles.testModeBanner}>
+            <View style={styles.testModeIcon}>
+              <Ionicons name="warning" size={16} color="#d97706" />
+            </View>
+            <Text style={styles.testModeText}>TEST MODE - No real money will be charged</Text>
           </View>
-        </View>
+        )}
+
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={80} color={theme.colors.error[600]} />
+              <Text style={styles.errorTitle}>Payment Failed</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+              <Button
+                title="Try Again"
+                onPress={() => {
+                  setError(null);
+                  setPaymentCollected(false);
+                  setPaymentData(null);
+                }}
+                style={styles.retryButton}
+              />
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.backButtonText}>Go Back to Checkout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-        <View style={styles.header}>
-          <Ionicons name="lock-closed" size={24} color={theme.colors.primary[600]} />
-          <Text style={styles.title}>Secure Payment</Text>
-          <Text style={styles.subtitle}>Complete your payment to place your order</Text>
+      <BackButtonHeader
+        title="Payment"
+        onBack={() => router.back()}
+      />
+      
+      {/* Test Mode Banner */}
+      {isTestMode && (
+        <View style={styles.testModeBanner}>
+          <View style={styles.testModeIcon}>
+            <Ionicons name="warning" size={16} color="#d97706" />
+          </View>
+          <Text style={styles.testModeText}>TEST MODE - No real money will be charged</Text>
         </View>
+      )}
 
-        {/* Order Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
-          {items.map((item) => (
-            <View key={item.id} style={styles.orderItem}>
-              <Text style={styles.itemName}>{item.product.name}</Text>
-              <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-              <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
-            </View>
-          ))}
-          
-          <View style={styles.orderSummary}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal:</Text>
-              <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax:</Text>
-              <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Shipping:</Text>
-              <Text style={styles.summaryValue}>${shipping.toFixed(2)}</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Ionicons name="lock-closed" size={24} color={theme.colors.primary[600]} />
+            <Text style={styles.title}>Secure Payment</Text>
+            <Text style={styles.subtitle}>Complete your payment to place your order</Text>
+          </View>
+
+          {/* Order Summary */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Order Summary</Text>
+            {items.map((item) => (
+              <View key={item.id} style={styles.orderItem}>
+                <Text style={styles.itemName}>{item.product.name}</Text>
+                <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+              </View>
+            ))}
+            
+            <View style={styles.orderSummary}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal:</Text>
+                <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tax:</Text>
+                <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Shipping:</Text>
+                <Text style={styles.summaryValue}>${shipping.toFixed(2)}</Text>
+              </View>
+              <View style={[styles.summaryRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total:</Text>
+                <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Payment Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentMethodCard}>
-            <Ionicons 
-              name={getPaymentMethodIcon(paymentMethod)} 
-              size={24} 
-              color={theme.colors.primary[600]} 
-            />
-            <Text style={styles.paymentMethodText}>
-              {getPaymentMethodDisplayName(paymentMethod)}
-            </Text>
+          {/* Payment Method */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <View style={styles.paymentMethodCard}>
+              <Ionicons 
+                name={getPaymentMethodIcon(paymentMethod)} 
+                size={24} 
+                color={theme.colors.primary[600]} 
+              />
+              <Text style={styles.paymentMethodText}>
+                {getPaymentMethodDisplayName(paymentMethod)}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        {/* Shipping Address */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shipping Address</Text>
-          {selectedAddress && (
-            <View style={styles.addressCard}>
-              <Text style={styles.addressText}>
-                {selectedAddress.street}
-              </Text>
-              <Text style={styles.addressText}>
-                {selectedAddress.city}, {selectedAddress.state} {selectedAddress.zipCode}
-              </Text>
-              <Text style={styles.addressText}>
-                {selectedAddress.country}
-              </Text>
+          {/* Shipping Address */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Shipping Address</Text>
+            {selectedAddress && (
+              <View style={styles.addressCard}>
+                <Text style={styles.addressText}>
+                  {selectedAddress.street}
+                </Text>
+                <Text style={styles.addressText}>
+                  {selectedAddress.city}, {selectedAddress.state} {selectedAddress.zipCode}
+                </Text>
+                <Text style={styles.addressText}>
+                  {selectedAddress.country}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Payment Status */}
+          {paymentCollected && (
+            <View style={styles.section}>
+              <View style={styles.successCard}>
+                <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
+                <Text style={styles.successText}>Payment Collected Successfully</Text>
+                <Text style={styles.successSubtext}>Creating your order...</Text>
+              </View>
             </View>
           )}
         </View>
-
-        {/* Payment Status */}
-        {paymentCollected && (
-          <View style={styles.section}>
-            <View style={styles.successCard}>
-              <Ionicons name="checkmark-circle" size={24} color={theme.colors.success[600]} />
-              <Text style={styles.successText}>Payment Collected Successfully</Text>
-              <Text style={styles.successSubtext}>Creating your order...</Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -593,5 +624,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.primary[600],
     textAlign: 'center',
+  },
+  testModeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[50],
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[200],
+  },
+  testModeIcon: {
+    marginRight: 8,
+  },
+  testModeText: {
+    fontSize: 14,
+    color: theme.colors.warning[700],
+    fontWeight: '500',
+  },
+  scrollView: {
+    flex: 1,
   },
 }); 

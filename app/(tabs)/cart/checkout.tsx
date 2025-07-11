@@ -19,6 +19,9 @@ import {
 import { useRouter } from 'expo-router';
 import { useCartStore } from '../../../src/store/cartStore';
 import { useAddressStore } from '../../../src/store/addressStore';
+import { useAuthStore } from '../../../src/store/authStore';
+import { useOrderStore } from '../../../src/store/orderStore';
+import { useRazorpayPayment } from '../../../src/hooks/useRazorpayPayment';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { AddAddressModal } from '../../../src/components/AddAddressModal';
@@ -26,10 +29,12 @@ import { OrderSummary } from '../../../src/components/OrderSummary';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../src/styles/theme';
 import { AddressDto } from '../../../src/types/api';
+import orderService from '../../../src/services/orderService';
+import { PaymentMethod } from '../../../src/types/order';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-interface PaymentMethod {
+interface PaymentMethodOption {
   id: string;
   name: string;
   subtitle: string;
@@ -38,7 +43,7 @@ interface PaymentMethod {
   comingSoon?: boolean;
 }
 
-const paymentMethods: PaymentMethod[] = [
+const paymentMethods: PaymentMethodOption[] = [
   {
     id: 'upi',
     name: 'UPI',
@@ -74,8 +79,11 @@ const paymentMethods: PaymentMethod[] = [
 
 export default function CheckoutScreen() {
   const router = useRouter();
-  const { items, total } = useCartStore();
+  const { items, total, subtotal, tax, shipping, finalTotal, clearCart } = useCartStore();
   const { addresses, loading: addressesLoading, fetchAddresses } = useAddressStore();
+  const { user } = useAuthStore();
+  const { addNewOrder } = useOrderStore();
+  const { initiatePayment, isLoading: isPaymentLoading } = useRazorpayPayment();
   
   // Address states
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -174,50 +182,75 @@ export default function CheckoutScreen() {
     setSelectedPaymentMethod(methodId);
   };
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
     // Validate address selection
     if (!selectedAddressId) {
       Alert.alert('Error', 'Please select a shipping address');
       return;
     }
 
-    // Validate payment method selection
-    if (!selectedPaymentMethod) {
-      Alert.alert('Error', 'Please select a payment method');
+    if (!user) {
+      Alert.alert('Error', 'Please login to continue');
       return;
     }
 
     setLoading(true);
     
-    if (selectedPaymentMethod === 'cod') {
-      // For COD, go directly to order creation
-      router.push({
-        pathname: '/(tabs)/cart/order-processing',
-        params: {
-          selectedAddressId,
-          paymentMethod: 'cash_on_delivery',
-          skipPayment: 'true',
-        }
-      });
-    } else {
-      // For online payments, go to payment processing
-      let mappedPaymentMethod = 'razorpay_card';
-      if (selectedPaymentMethod === 'upi') {
-        mappedPaymentMethod = 'razorpay_upi';
-      }
+    try {
+      // Directly trigger Razorpay payment
+      console.log('💳 Initiating Razorpay payment from checkout...');
       
-      router.push({
-        pathname: '/(tabs)/cart/payment-processing-online',
-        params: {
-          selectedAddressId,
-          paymentMethod: mappedPaymentMethod,
-          amount: total.toString(),
+      const paymentResult = await initiatePayment({
+        amount: finalTotal,
+        currency: 'INR',
+        orderId: `temp_${Date.now()}`, // Temporary order ID for payment
+        name: 'E-Commerce App',
+        description: `Payment for cart items (${items.length} items)`,
+        email: user.email,
+        receipt: `receipt_${Date.now()}`
+      });
+
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || 'Payment failed');
+      }
+
+      // Payment successful, create order
+      console.log('📦 Creating order after successful payment...');
+      
+      const orderRequest = {
+        billingAddressId: selectedAddressId,
+        shippingAddressId: selectedAddressId,
+        paymentMethod: PaymentMethod.RAZORPAY_UPI, // Default to UPI
+        customerNotes: `Payment ID: ${paymentResult.paymentId}, Order ID: ${paymentResult.orderId}`
+      };
+
+      const createdOrder = await orderService.createOrderFromCart(orderRequest);
+      
+      // Add order to store
+      addNewOrder(createdOrder);
+      
+      // Clear cart
+      await clearCart();
+      
+      // Navigate to success screen
+      router.replace({
+        pathname: '/(tabs)/cart/order-success',
+        params: { 
+          orderNumber: createdOrder.orderNumber, 
+          orderId: createdOrder.id,
+          paymentId: paymentResult.paymentId
         }
       });
+      
+    } catch (error: any) {
+      console.error('Payment process failed:', error);
+      Alert.alert('Payment Failed', error.message || 'Please try again');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderPaymentMethod = (method: PaymentMethod) => {
+  const renderPaymentMethod = (method: PaymentMethodOption) => {
     const isSelected = selectedPaymentMethod === method.id;
     
     return (
@@ -283,9 +316,7 @@ export default function CheckoutScreen() {
     );
   };
 
-  // Calculate shipping based on subtotal
-  const shipping = total > 50 ? 0 : 9.99; // Free shipping over $50
-  const finalTotal = total + (total * 0.08) + shipping;
+  // Totals are now calculated centrally in useCartStore
 
   // Get the selected address or default address
   const selectedAddress = addresses.find((addr: AddressDto) => addr.id === selectedAddressId);
@@ -331,7 +362,6 @@ export default function CheckoutScreen() {
         {/* Order Summary Card */}
         <OrderSummary
           items={items}
-          shippingCost={shipping}
           showItems={true}
           collapsible={true}
           isExpanded={isOrderSummaryExpanded}
@@ -421,27 +451,29 @@ export default function CheckoutScreen() {
           )}
         </View>
 
-        {/* Payment Method Selection Card */}
-        <View style={styles.paymentCard}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIcon}>
-              <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
+        {/* Payment Method Selection Card - HIDDEN (keeping code for future use) */}
+        {false && (
+          <View style={styles.paymentCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
+              </View>
+              <Text style={styles.cardTitle}>Payment Method</Text>
             </View>
-            <Text style={styles.cardTitle}>Payment Method</Text>
-          </View>
 
-          <View style={styles.paymentMethodsList}>
-            {paymentMethods.map(renderPaymentMethod)}
-          </View>
+            <View style={styles.paymentMethodsList}>
+              {paymentMethods.map(renderPaymentMethod)}
+            </View>
 
-          {/* Security Note */}
-          <View style={styles.securityNote}>
-            <Ionicons name="shield-checkmark" size={20} color={theme.colors.success[600]} />
-            <Text style={styles.securityText}>
-              Your payment information is encrypted and secure
-            </Text>
+            {/* Security Note */}
+            <View style={styles.securityNote}>
+              <Ionicons name="shield-checkmark" size={20} color={theme.colors.success[600]} />
+              <Text style={styles.securityText}>
+                Your payment information is encrypted and secure
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
       </ScrollView>
 
@@ -517,9 +549,9 @@ export default function CheckoutScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          title={loading ? 'Processing...' : selectedPaymentMethod === 'cod' ? `Place Order - $${finalTotal.toFixed(2)}` : `Pay $${finalTotal.toFixed(2)}`}
+          title={loading || isPaymentLoading ? 'Processing...' : `Pay $${finalTotal.toFixed(2)}`}
           onPress={handleProceedToPayment}
-          disabled={loading}
+          disabled={loading || isPaymentLoading}
           variant="primary"
           size="lg"
           fullWidth

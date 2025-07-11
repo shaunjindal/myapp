@@ -4,6 +4,7 @@ import com.ecommerce.application.dto.PaymentOrderRequest;
 import com.ecommerce.application.dto.PaymentOrderResponse;
 import com.ecommerce.application.dto.PaymentVerificationRequest;
 import com.ecommerce.application.dto.PaymentVerificationResponse;
+import com.ecommerce.application.dto.RefundResponse;
 import com.ecommerce.application.service.RazorpayPaymentService;
 import com.ecommerce.infrastructure.persistence.entity.PaymentJpaEntity;
 import io.swagger.v3.oas.annotations.Operation;
@@ -240,5 +241,88 @@ public class PaymentController {
     @ApiResponse(responseCode = "200", description = "Service is healthy")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Payment service is healthy");
+    }
+
+    /**
+     * Processes a refund for a payment
+     * 
+     * @param paymentId the payment ID to refund
+     * @param refundAmount the amount to refund (optional, full refund if null)
+     * @param reason the reason for refund (optional)
+     * @return Refund response
+     */
+    @PostMapping("/refund")
+    @Operation(summary = "Process refund", description = "Processes a refund for a payment")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Refund processed successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "404", description = "Payment not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<RefundResponse> processRefund(
+            @Parameter(description = "Payment ID", required = true)
+            @RequestParam String paymentId,
+            @Parameter(description = "Refund amount (optional, full refund if not specified)")
+            @RequestParam(required = false) java.math.BigDecimal refundAmount,
+            @Parameter(description = "Reason for refund (optional)")
+            @RequestParam(required = false) String reason) {
+        
+        try {
+            logger.info("Processing refund for payment: {}, amount: {}", paymentId, refundAmount);
+            
+            RefundResponse response = razorpayPaymentService.processRefund(paymentId, refundAmount, reason);
+            
+            if (response.isSuccess()) {
+                logger.info("Refund processed successfully: {}", response.getRefundId());
+                return ResponseEntity.ok(response);
+            } else {
+                logger.warn("Refund processing failed: {}", response.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error processing refund: {}", e.getMessage(), e);
+            RefundResponse errorResponse = RefundResponse.error("Internal server error");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Webhook endpoint for Razorpay payment status notifications
+     * 
+     * @param payload the webhook payload from Razorpay
+     * @param signature the webhook signature for verification
+     * @return Success response
+     */
+    @PostMapping("/webhook")
+    @Operation(summary = "Razorpay webhook", description = "Handles Razorpay webhook notifications for payment status updates")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Webhook processed successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid webhook signature"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<String> handleWebhook(
+            @RequestBody String payload,
+            @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature) {
+        
+        try {
+            logger.info("Received Razorpay webhook notification");
+            
+            // Process the webhook
+            boolean processed = razorpayPaymentService.processWebhook(payload, signature);
+            
+            if (processed) {
+                logger.info("Webhook processed successfully");
+                return ResponseEntity.ok("Webhook processed successfully");
+            } else {
+                logger.warn("Webhook processing failed - invalid signature");
+                return ResponseEntity.badRequest().body("Invalid webhook signature");
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error processing webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error processing webhook");
+        }
     }
 } 

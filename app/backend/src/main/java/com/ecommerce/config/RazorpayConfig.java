@@ -24,6 +24,8 @@ public class RazorpayConfig {
     private String keySecret;
     private String webhookSecret;
     private String currency = "INR";
+    private boolean autoCapture = true;
+    private int captureTimeoutMinutes = 5;
     
     /**
      * Creates and configures the Razorpay client bean
@@ -90,5 +92,21 @@ public class RazorpayConfig {
     
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+
+    public boolean isAutoCapture() {
+        return autoCapture;
+    }
+    
+    public void setAutoCapture(boolean autoCapture) {
+        this.autoCapture = autoCapture;
+    }
+    
+    public int getCaptureTimeoutMinutes() {
+        return captureTimeoutMinutes;
+    }
+    
+    public void setCaptureTimeoutMinutes(int captureTimeoutMinutes) {
+        this.captureTimeoutMinutes = captureTimeoutMinutes;
     }
 } 
