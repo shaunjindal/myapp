@@ -250,50 +250,96 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
-        {/* Product Info */}
-        <View style={styles.infoContainer}>
-          {/* Brand and Category Row */}
-          <View style={styles.brandCategoryRow}>
-            <View style={styles.brandBadge}>
-              <Text style={styles.brandText}>{product.brand}</Text>
+        {/* Product Information Card */}
+        <View style={styles.cardContainer}>
+          {/* Card Header */}
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconContainer}>
+              <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary[600]} />
             </View>
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{product.category}</Text>
-            </View>
+            <Text style={styles.cardTitle}>Product Information</Text>
           </View>
 
-          {/* Product Name */}
-          <Text style={styles.productName}>{product.name}</Text>
+          {/* Product Summary */}
+          <View style={styles.productSummary}>
+            {/* Product Name */}
+            <Text style={styles.productName}>{product.name}</Text>
 
-          {/* Rating and Reviews */}
-          <View style={styles.ratingSection}>
-            <View style={styles.starsContainer}>
-              <Text style={styles.stars}>{'★'.repeat(Math.floor(product.rating)) + '☆'.repeat(5 - Math.floor(product.rating))}</Text>
-              <Text style={styles.ratingValue}>{product.rating}</Text>
-            </View>
-            <Text style={styles.reviewCount}>({product.reviewCount} reviews)</Text>
-          </View>
-
-          {/* Price Section */}
-          <View style={styles.priceSection}>
-            <View style={styles.currentPriceContainer}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <Text style={styles.price}>{product.price}</Text>
-            </View>
-            {product.originalPrice && (product.originalPrice - product.price) > 0 && (
-              <View style={styles.originalPriceContainer}>
-                <Text style={styles.originalPrice}>${product.originalPrice}</Text>
-                <Text style={styles.savings}>
-                  Save ${(product.originalPrice - product.price).toFixed(2)}
-                </Text>
+            {/* Brand and Category Row */}
+            <View style={styles.brandCategoryRow}>
+              <View style={styles.brandBadge}>
+                <Ionicons name="storefront-outline" size={14} color={theme.colors.text.inverse} />
+                <Text style={styles.brandText}>{product.brand}</Text>
               </View>
-            )}
+              <View style={styles.categoryBadge}>
+                <Ionicons name="folder-outline" size={14} color={theme.colors.primary[700]} />
+                <Text style={styles.categoryText}>{product.category}</Text>
+              </View>
+            </View>
+
+            {/* Price Section */}
+            <View style={styles.priceSection}>
+              <View style={styles.priceContainer}>
+                <View style={styles.currentPriceRow}>
+                  <Text style={styles.currencySymbol}>$</Text>
+                  <Text style={styles.price}>{product.price}</Text>
+                  {product.originalPrice && (product.originalPrice - product.price) > 0 && (
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>
+                        -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {product.originalPrice && (product.originalPrice - product.price) > 0 && (
+                  <View style={styles.originalPriceRow}>
+                    <Text style={styles.originalPrice}>Was ${product.originalPrice}</Text>
+                    <Text style={styles.savings}>
+                      You save ${(product.originalPrice - product.price).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
+
+          {/* Availability Section */}
+          <View style={styles.availabilitySection}>
+            <View style={styles.availabilityHeader}>
+              <Ionicons 
+                name={product.inStock ? "checkmark-circle" : "close-circle"} 
+                size={20} 
+                color={product.inStock ? theme.colors.success[600] : theme.colors.error[600]} 
+              />
+              <Text style={styles.availabilityLabel}>Availability</Text>
+            </View>
+            
+            <View style={styles.availabilityContent}>
+              <Text style={[
+                styles.availabilityStatus,
+                { color: product.inStock ? theme.colors.success[700] : theme.colors.error[700] }
+              ]}>
+                {product.inStock ? 'In Stock' : 'Out of Stock'}
+              </Text>
+              
+              {product.inStock && (
+                <Text style={styles.availabilityQuantity}>
+                  {product.stockQuantity} units available
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Description Divider */}
+          <View style={styles.sectionDivider} />
 
           {/* Description Section */}
           <View style={styles.descriptionSection}>
             <View style={styles.descriptionHeader}>
-              <Text style={styles.descriptionTitle}>Description</Text>
+              <View style={styles.descriptionTitleContainer}>
+                <Ionicons name="document-text-outline" size={18} color={theme.colors.primary[600]} />
+                <Text style={styles.descriptionTitle}>Description</Text>
+              </View>
               <TouchableOpacity 
                 style={styles.expandButton}
                 onPress={() => setDescriptionExpanded(!descriptionExpanded)}
@@ -324,58 +370,45 @@ export default function ProductDetailScreen() {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Stock Status */}
-          <View style={styles.stockSection}>
-            <View style={styles.stockHeader}>
-              <Text style={styles.stockLabel}>Availability</Text>
-              <View style={[
-                styles.stockStatusDot,
-                { backgroundColor: product.inStock ? theme.colors.success[500] : theme.colors.error[500] }
-              ]} />
-            </View>
-            
-            <View style={styles.stockContent}>
-              <Text style={[
-                styles.stockStatus,
-                { color: product.inStock ? theme.colors.success[700] : theme.colors.error[700] }
-              ]}>
-                {product.inStock ? 'In Stock' : 'Out of Stock'}
-              </Text>
-              
-              {product.inStock && (
-                <Text style={styles.stockQuantity}>
-                  {product.stockQuantity} units available
-                </Text>
-              )}
-            </View>
-          </View>
-
         </View>
 
-        {/* Specifications */}
+        {/* Specifications Card */}
         {Object.keys(product.specifications).length > 0 && (
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Specifications</Text>
-            {Object.entries(product.specifications).map(([key, value]) => (
-              <View key={key} style={styles.specificationRow}>
-                <Text style={styles.specificationKey}>{key}:</Text>
-                <Text style={styles.specificationValue}>{String(value)}</Text>
+          <View style={styles.cardContainer}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIconContainer}>
+                <Ionicons name="list-outline" size={20} color={theme.colors.primary[600]} />
               </View>
-            ))}
+              <Text style={styles.cardTitle}>Specifications</Text>
+            </View>
+            <View style={styles.cardContent}>
+              {Object.entries(product.specifications).map(([key, value]) => (
+                <View key={key} style={styles.specificationRow}>
+                  <Text style={styles.specificationKey}>{key}:</Text>
+                  <Text style={styles.specificationValue}>{String(value)}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
-        {/* Tags */}
+        {/* Tags Card */}
         {product.tags.length > 0 && (
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Tags</Text>
-            <View style={styles.tags}>
-              {product.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
+          <View style={styles.cardContainer}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIconContainer}>
+                <Ionicons name="pricetags-outline" size={20} color={theme.colors.primary[600]} />
+              </View>
+              <Text style={styles.cardTitle}>Tags</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <View style={styles.tags}>
+                {product.tags.map((tag, index) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         )}
@@ -470,21 +503,21 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     position: 'relative',
-    height: 350,
+    height: 250,
   },
   carousel: {
-    height: 350,
+    height: 250,
     position: 'relative',
   },
   carouselSlide: {
     width: screenWidth,
-    height: 350,
+    height: 250,
     justifyContent: 'center',
     alignItems: 'center',
   },
   carouselImage: {
     width: screenWidth,
-    height: 350,
+    height: 250,
     resizeMode: 'cover',
   },
   pageIndicatorContainer: {
@@ -541,23 +574,80 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: theme.borderRadius.sm,
   },
-  infoContainer: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[200],
+  sectionDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
+    marginVertical: theme.spacing.lg,
   },
-  productName: {
-    fontSize: theme.typography.sizes.xl,
-    fontWeight: '700',
+  availabilitySection: {
+    backgroundColor: theme.colors.gray[50],
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    marginBottom: theme.spacing.md,
+  },
+  availabilityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  availabilityLabel: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600' as any,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.xl,
+    marginLeft: theme.spacing.sm,
   },
-  brandCategoryRow: {
+  availabilityContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginLeft: theme.spacing.lg + theme.spacing.sm, // Align with label
+  },
+  availabilityStatus: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '700' as any,
+  },
+  availabilityQuantity: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '500' as any,
+    color: theme.colors.text.secondary,
+  },
+  descriptionSection: {
+    marginTop: theme.spacing.xs,
+  },
+  descriptionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  descriptionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  descriptionTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600' as any,
+    color: theme.colors.text.primary,
+    marginLeft: theme.spacing.sm,
+  },
+  productSummary: {
+    backgroundColor: theme.colors.gray[50],
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.xl,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
+  },
+  productName: {
+    fontSize: theme.typography.sizes['2xl'],
+    fontWeight: '800' as any,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
+    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes['2xl'],
+  },
+  brandCategoryRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
   brandBadge: {
@@ -565,12 +655,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
     ...theme.shadows.md,
     elevation: 3,
   },
   brandText: {
     fontSize: 12,
-    fontWeight: '800' as any,
+    fontWeight: '700' as any,
     color: theme.colors.text.inverse,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -582,6 +675,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.full,
     borderWidth: 1.5,
     borderColor: theme.colors.primary[200],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
     ...theme.shadows.sm,
   },
   categoryText: {
@@ -590,46 +686,21 @@ const styles = StyleSheet.create({
     fontWeight: '700' as any,
     textTransform: 'capitalize',
   },
-  ratingSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.warning[50],
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.warning[200],
-  },
-  stars: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.warning[500],
-    marginRight: theme.spacing.sm,
-  },
-  ratingValue: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '700' as any,
-    color: theme.colors.warning[700],
-  },
-  reviewCount: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    fontWeight: '500' as any,
-    fontStyle: 'italic',
-  },
   priceSection: {
-    marginBottom: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
   },
-  currentPriceContainer: {
+  priceContainer: {
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+    ...theme.shadows.sm,
+  },
+  currentPriceRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: theme.spacing.sm,
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
   },
   currencySymbol: {
     fontSize: theme.typography.sizes.xl,
@@ -638,17 +709,35 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   price: {
-    fontSize: theme.typography.sizes['2xl'],
+    fontSize: theme.typography.sizes['3xl'],
     fontWeight: '800' as any,
     color: theme.colors.text.primary,
+    marginRight: theme.spacing.md,
   },
-  originalPriceContainer: {
+  discountBadge: {
+    backgroundColor: theme.colors.error[600],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.md,
+  },
+  discountText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '800' as any,
+    color: theme.colors.text.inverse,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  originalPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    justifyContent: 'space-between',
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
   },
   originalPrice: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.tertiary,
     textDecorationLine: 'line-through',
     fontWeight: '500' as any,
@@ -656,27 +745,13 @@ const styles = StyleSheet.create({
   savings: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.success[700],
-    fontWeight: '600' as any,
-    backgroundColor: theme.colors.success[50],
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.sm,
-  },
-  descriptionSection: {
-    marginBottom: theme.spacing.lg,
-  },
-  descriptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  descriptionTitle: {
-    fontSize: theme.typography.sizes.base,
     fontWeight: '700' as any,
-    color: theme.colors.text.primary,
-    textTransform: 'uppercase',
-    letterSpacing: theme.typography.letterSpacing.wide,
+    backgroundColor: theme.colors.success[50],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success[200],
   },
   expandButton: {
     padding: theme.spacing.xs,
@@ -697,53 +772,44 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.primary[200],
+    marginTop: theme.spacing.xs,
   },
   readMoreText: {
     fontSize: theme.typography.sizes.sm,
     fontWeight: '600' as any,
     color: theme.colors.primary[700],
   },
-  stockSection: {
+
+  cardContainer: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderTopColor: theme.colors.gray[200],
-    borderBottomColor: theme.colors.gray[200],
+    padding: theme.spacing.lg,
+    ...theme.shadows.md,
   },
-  stockHeader: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
   },
-  stockLabel: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600' as any,
-    color: theme.colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: theme.typography.letterSpacing.wide,
-  },
-  stockStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: theme.spacing.sm,
-  },
-  stockContent: {
-    flexDirection: 'row',
+  cardIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.primary[50],
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
   },
-  stockStatus: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '700' as any,
+  cardTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    flex: 1,
   },
-  stockQuantity: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '500' as any,
-    color: theme.colors.text.secondary,
+  cardContent: {
+    marginTop: theme.spacing.xs,
   },
   sectionContainer: {
     backgroundColor: theme.colors.surface,
@@ -761,14 +827,18 @@ const styles = StyleSheet.create({
   specificationRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[100],
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.lg,
+    marginBottom: theme.spacing.xs,
   },
   specificationKey: {
     fontSize: theme.typography.sizes.base,
     color: theme.colors.text.secondary,
     flex: 1,
+    fontWeight: '500' as any,
   },
   specificationValue: {
     fontSize: theme.typography.sizes.base,
@@ -780,14 +850,16 @@ const styles = StyleSheet.create({
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: theme.spacing.xs,
   },
   tag: {
     backgroundColor: theme.colors.primary[100],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.full,
-    marginRight: theme.spacing.xs,
-    marginBottom: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+    ...theme.shadows.sm,
   },
   tagText: {
     fontSize: theme.typography.sizes.sm,

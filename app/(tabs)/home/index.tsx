@@ -18,8 +18,6 @@ import { Button } from '../../../src/components/Button';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
-
 export default function HomeScreen() {
   const router = useRouter();
   const { products, categories, fetchProducts, loading, error } = useProductStore();
@@ -27,10 +25,6 @@ export default function HomeScreen() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
-    console.log('🏠 HomeScreen: Component mounted, calling fetchProducts...');
-    console.log('🏠 HomeScreen: Initial loading state:', loading);
-    console.log('🏠 HomeScreen: Initial products length:', products.length);
-    
     // Only fetch if we don't have products yet
     if (products.length === 0) {
       fetchProducts();
@@ -38,15 +32,6 @@ export default function HomeScreen() {
       setIsInitialLoad(false);
     }
   }, []);
-
-  // Debug logging for state changes
-  useEffect(() => {
-    console.log('🏠 HomeScreen: Loading state changed to:', loading);
-    console.log('🏠 HomeScreen: Products length:', products.length);
-    console.log('🏠 HomeScreen: Categories length:', categories.length);
-    console.log('🏠 HomeScreen: Error state:', error);
-    console.log('🏠 HomeScreen: Initial load state:', isInitialLoad);
-  }, [loading, products, categories, error, isInitialLoad]);
 
   // Update initial load state when products are loaded
   useEffect(() => {

@@ -325,6 +325,31 @@ public class CartController {
     }
     
     /**
+     * Calculate payment components for cart
+     */
+    @PostMapping("/calculate-components")
+    public ResponseEntity<CartDto> calculatePaymentComponents(
+            @RequestBody(required = false) Map<String, Object> request, 
+            HttpServletRequest httpRequest) {
+        try {
+            String addressId = request != null ? (String) request.get("addressId") : null;
+            String shippingMethod = request != null ? (String) request.get("shippingMethod") : null;
+            String discountCode = request != null ? (String) request.get("discountCode") : null;
+            
+            CartJpaEntity cart = getOrCreateCart(httpRequest);
+            CartJpaEntity updatedCart = cartService.calculatePaymentComponents(cart.getId(), addressId, shippingMethod, discountCode);
+            CartDto cartDto = cartMapper.toDto(updatedCart);
+            
+            logger.info("Payment components calculated for cart: {}", cart.getId());
+            return ResponseEntity.ok(cartDto);
+            
+        } catch (Exception e) {
+            logger.error("Failed to calculate payment components", e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    /**
      * Get cart statistics (admin endpoint)
      */
     @GetMapping("/admin/statistics")

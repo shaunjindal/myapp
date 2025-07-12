@@ -111,8 +111,13 @@ export const RecommendationSection: React.FC<RecommendationSectionProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.cardContainer}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconContainer}>
+            <Ionicons name="sparkles-outline" size={20} color={theme.colors.primary[600]} />
+          </View>
+          <Text style={styles.cardTitle}>{title}</Text>
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={theme.colors.primary[600]} />
           <Text style={styles.loadingText}>Loading recommendations...</Text>
@@ -123,8 +128,13 @@ export const RecommendationSection: React.FC<RecommendationSectionProps> = ({
 
   if (error) {
     return (
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.cardContainer}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconContainer}>
+            <Ionicons name="sparkles-outline" size={20} color={theme.colors.primary[600]} />
+          </View>
+          <Text style={styles.cardTitle}>{title}</Text>
+        </View>
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={24} color={theme.colors.error[500]} />
           <Text style={styles.errorText}>{error}</Text>
@@ -138,8 +148,13 @@ export const RecommendationSection: React.FC<RecommendationSectionProps> = ({
   }
 
   return (
-    <View style={styles.sectionContainer}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.cardContainer}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardIconContainer}>
+          <Ionicons name="sparkles-outline" size={20} color={theme.colors.primary[600]} />
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
       
       <FlatList
         data={recommendations}
@@ -155,6 +170,35 @@ export const RecommendationSection: React.FC<RecommendationSectionProps> = ({
 };
 
 const styles = StyleSheet.create({
+  cardContainer: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  cardIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  cardTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
   sectionContainer: {
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.md,
@@ -167,25 +211,24 @@ const styles = StyleSheet.create({
   },
 
   recommendationsList: {
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.xs,
   },
   separator: {
     width: theme.spacing.md,
   },
   recommendationCard: {
     width: 160,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    marginBottom: theme.spacing.sm,
+    overflow: 'hidden',
+    ...theme.shadows.md,
   },
   imageContainer: {
     position: 'relative',
-    borderTopLeftRadius: theme.borderRadius.md,
-    borderTopRightRadius: theme.borderRadius.md,
+    borderTopLeftRadius: theme.borderRadius['2xl'],
+    borderTopRightRadius: theme.borderRadius['2xl'],
     overflow: 'hidden',
   },
   productImage: {

@@ -1,11 +1,14 @@
 package com.ecommerce.application.dto;
 
+import com.ecommerce.application.service.PaymentComponentService;
 import com.ecommerce.infrastructure.persistence.entity.CartJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.CartItemJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.ProductJpaEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,6 +20,13 @@ import java.util.stream.Collectors;
  */
 @Component
 public class CartMapper {
+    
+    private final PaymentComponentService paymentComponentService;
+    
+    @Autowired
+    public CartMapper(PaymentComponentService paymentComponentService) {
+        this.paymentComponentService = paymentComponentService;
+    }
     
     /**
      * Convert CartJpaEntity to CartDto
@@ -45,6 +55,12 @@ public class CartMapper {
         dto.setLastActivityAt(entity.getLastActivityAt());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
+        dto.setCurrency(entity.getCurrency());
+        
+        // Calculate payment components dynamically
+        List<PaymentComponent> paymentComponents = paymentComponentService.calculatePaymentComponentsList(
+            entity, null, null, entity.getDiscountCode(), null);
+        dto.setPaymentComponents(paymentComponents);
         
         // Convert cart items
         if (entity.getItems() != null) {

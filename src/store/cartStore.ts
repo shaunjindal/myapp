@@ -30,19 +30,76 @@ const generateSessionId = (): string => {
   return `${timestamp}-${random}`;
 };
 
-// Calculate totals from items
-const calculateTotals = (items: CartItem[]) => {
+// Calculate totals from items and process payment components from backend
+const calculateTotals = (items: CartItem[], backendCart?: any) => {
   const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  const tax = subtotal * 0.08; // 8% tax
-  const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
-  const finalTotal = subtotal + tax + shipping;
+  
+  // Process payment components from backend
+  const paymentComponents = backendCart?.paymentComponents || [];
+  let tax = 0;
+  let shipping = 0;
+  let discount = 0;
+  let fees = 0;
+  
+  // Component info for display
+  let taxLabel = 'Tax';
+  let shippingLabel = 'Shipping'; 
+  let discountLabel = 'Discount';
+  let taxDescription = 'Tax amount';
+  let shippingDescription = 'Shipping cost';
+  let discountDescription = 'Discount applied';
+  
+  // Process each component
+  paymentComponents.forEach((component: any) => {
+    const amount = component.amount || 0;
+    const effectiveAmount = component.isNegative ? -amount : amount;
+    
+    switch (component.type) {
+      case 'TAX':
+        tax = amount;
+        taxLabel = component.text || 'Tax';
+        taxDescription = `Tax component: ${component.text}`;
+        break;
+      case 'SHIPPING':
+        shipping = amount;
+        shippingLabel = component.text || 'Shipping';
+        shippingDescription = `Shipping: ${component.text}`;
+        break;
+      case 'DISCOUNT':
+        discount = amount;
+        discountLabel = component.text || 'Discount';
+        discountDescription = `Discount: ${component.text}`;
+        break;
+      case 'FEE':
+        fees += amount;
+        break;
+      default:
+        // Handle other component types as fees
+        fees += effectiveAmount;
+    }
+  });
+  
+  // Calculate final total using backend amount or fallback calculation
+  const finalTotal = backendCart?.totalAmount || (subtotal + tax + shipping + fees - discount);
   
   return {
     total: subtotal, // Keep legacy total for backward compatibility
     subtotal,
     tax,
     shipping,
+    discount,
+    fees,
     finalTotal,
+    // Component labels and descriptions from backend
+    taxLabel,
+    shippingLabel,
+    discountLabel,
+    taxDescription,
+    shippingDescription,
+    discountDescription,
+    // Include full component list for advanced UI
+    paymentComponents,
+    currency: backendCart?.currency || 'USD',
   };
 };
 
@@ -75,7 +132,7 @@ const convertApiCartToFrontend = (apiCart: any) => {
     quantity: item.quantity || 0,
   }));
   
-  const totals = calculateTotals(items);
+  const totals = calculateTotals(items, apiCart);
   
   return {
     items,
@@ -99,7 +156,21 @@ export interface CartStoreState extends CartState {
   subtotal: number;
   tax: number;
   shipping: number;
+  discount: number;
+  fees: number;
   finalTotal: number;
+  
+  // Payment component labels and descriptions from backend
+  taxLabel: string;
+  shippingLabel: string;
+  discountLabel: string;
+  taxDescription: string;
+  shippingDescription: string;
+  discountDescription: string;
+  
+  // Payment components from backend
+  paymentComponents: any[];
+  currency: string;
   
   // Cart persistence methods
   initializeCart: () => Promise<void>;
@@ -123,7 +194,17 @@ export const useCartStore = create<CartStoreState>()(
       subtotal: 0,
       tax: 0,
       shipping: 0,
+      discount: 0,
+      fees: 0,
       finalTotal: 0,
+      taxLabel: 'Tax',
+      shippingLabel: 'Shipping',
+      discountLabel: 'Discount',
+      taxDescription: 'Tax amount',
+      shippingDescription: 'Shipping cost',
+      discountDescription: 'Discount applied',
+      paymentComponents: [],
+      currency: 'USD',
       sessionId: null,
       deviceFingerprint: null,
       cartId: null,
@@ -150,7 +231,7 @@ export const useCartStore = create<CartStoreState>()(
           } else {
             // Get or create cart session
             const apiCart = await cartService.getCart();
-            const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
+                                  const { items, total, subtotal, tax, shipping, discount, fees, finalTotal, cartId, taxLabel, shippingLabel, discountLabel, taxDescription, shippingDescription, discountDescription, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
             
             set({ 
               items, 
@@ -158,8 +239,18 @@ export const useCartStore = create<CartStoreState>()(
               subtotal,
               tax,
               shipping,
+              discount,
+              fees,
               finalTotal,
               cartId,
+              taxLabel,
+              shippingLabel,
+              discountLabel,
+              taxDescription,
+              shippingDescription,
+              discountDescription,
+              paymentComponents,
+              currency,
               lastSyncAt: new Date(),
             });
             
@@ -227,17 +318,27 @@ export const useCartStore = create<CartStoreState>()(
         try {
           console.log('Syncing with server...');
           const apiCart = await cartService.getCart();
-          const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
+          const { items, total, subtotal, tax, shipping, discount, fees, finalTotal, cartId, taxLabel, shippingLabel, discountLabel, taxDescription, shippingDescription, discountDescription, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
           
-          console.log('Server sync successful:', { items, total, subtotal, tax, shipping, finalTotal, cartId });
+          console.log('Server sync successful:', { items, total, subtotal, tax, shipping, discount, fees, finalTotal, cartId });
           set({
             items,
             total,
             subtotal,
             tax,
             shipping,
+            discount,
+            fees,
             finalTotal,
             cartId,
+            taxLabel,
+            shippingLabel,
+            discountLabel,
+            taxDescription,
+            shippingDescription,
+            discountDescription,
+            paymentComponents,
+            currency,
             lastSyncAt: new Date(),
           });
           
@@ -264,7 +365,17 @@ export const useCartStore = create<CartStoreState>()(
             subtotal: 0,
             tax: 0,
             shipping: 0,
+            discount: 0,
+            fees: 0,
             finalTotal: 0,
+            taxLabel: 'Tax',
+            shippingLabel: 'Shipping',
+            discountLabel: 'Discount',
+            taxDescription: 'Tax amount',
+            shippingDescription: 'Shipping cost',
+            discountDescription: 'Discount applied',
+            paymentComponents: [],
+            currency: 'USD',
             cartId: null,
             isGuest: true,
             lastSyncAt: null,
@@ -325,9 +436,9 @@ export const useCartStore = create<CartStoreState>()(
           
           // Use the item ID directly to avoid unnecessary GET call
           const apiCart = await cartService.updateCartItem(item.id, { quantity });
-          const { items: updatedItems, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
+          const { items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
           
-          set({ items: updatedItems, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
+          set({ items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(updatedItems.length);
         } catch (error) {
           console.error('Failed to update item quantity:', error);
@@ -356,9 +467,9 @@ export const useCartStore = create<CartStoreState>()(
           
           // Use the item ID directly to avoid unnecessary GET call
           const apiCart = await cartService.removeFromCart(item.id);
-          const { items: updatedItems, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
+          const { items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
           
-          set({ items: updatedItems, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
+          set({ items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency, lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(updatedItems.length);
         } catch (error) {
           console.error('Failed to remove item from cart:', error);
@@ -377,12 +488,12 @@ export const useCartStore = create<CartStoreState>()(
           await cartService.clearCart();
           console.log('Cart cleared on backend');
           
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0, lastSyncAt: new Date() });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD', lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(0);
         } catch (error) {
           console.error('Failed to clear cart:', error);
           // Still clear local state
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD' });
         }
       },
       
@@ -407,14 +518,14 @@ export const useCartStore = create<CartStoreState>()(
           console.log('Cart cleared on backend');
           
           // Update local state
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0, lastSyncAt: new Date() });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD', lastSyncAt: new Date() });
           
           // Update session manager
           await sessionManager.updateCartActivity(0);
         } catch (error) {
           console.error('Failed to clear cart on backend:', error);
           // Still clear local state even if backend fails
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD' });
         }
       },
       
@@ -461,23 +572,27 @@ export const useCartStore = create<CartStoreState>()(
         try {
           console.log('Syncing cart from backend...');
           const apiCart = await cartService.getCart();
-          const { items, total, subtotal, tax, shipping, finalTotal, cartId } = convertApiCartToFrontend(apiCart);
+          const { items, total, subtotal, tax, shipping, discount, fees, finalTotal, cartId, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
           
-          console.log('Cart synced successfully:', { items, total, subtotal, tax, shipping, finalTotal, cartId });
+          console.log('Cart synced successfully:', { items, total, subtotal, tax, shipping, discount, fees, finalTotal, cartId });
           set({
             items,
             total,
             subtotal,
             tax,
             shipping,
+            discount,
+            fees,
             finalTotal,
             cartId,
+            paymentComponents,
+            currency,
             lastSyncAt: new Date(),
           });
         } catch (error) {
           console.error('Failed to sync cart:', error);
           // If sync fails, just clear the cart
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, finalTotal: 0 });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD' });
         }
       },
     }),

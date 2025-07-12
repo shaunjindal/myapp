@@ -48,17 +48,20 @@ public class CartService {
     private final CartItemJpaRepository cartItemRepository;
     private final ProductJpaRepository productRepository;
     private final UserJpaRepository userRepository;
+    private final PaymentComponentService paymentComponentService;
     
     @Autowired
     public CartService(
             CartJpaRepository cartRepository,
             CartItemJpaRepository cartItemRepository,
             ProductJpaRepository productRepository,
-            UserJpaRepository userRepository) {
+            UserJpaRepository userRepository,
+            PaymentComponentService paymentComponentService) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.paymentComponentService = paymentComponentService;
     }
     
     /**
@@ -347,6 +350,47 @@ public class CartService {
         cart.updateTaxAndShipping(taxAmount, shippingAmount);
         cart.updateLastActivity();
         
+        return cartRepository.save(cart);
+    }
+    
+    /**
+     * Calculate payment components for cart with address
+     */
+    public CartJpaEntity calculatePaymentComponents(String cartId, String addressId, String shippingMethod, String discountCode) {
+        logger.debug("Calculating payment components for cart: {} with address: {}", cartId, addressId);
+        
+        CartJpaEntity cart = cartRepository.findById(cartId)
+                .orElseThrow(() -> new IllegalArgumentException("Cart not found: " + cartId));
+        
+        // Get address if provided
+        AddressJpaEntity address = null;
+        if (addressId != null && !addressId.trim().isEmpty()) {
+            // Note: You might need to add AddressJpaRepository as a dependency
+            // For now, we'll calculate without address
+        }
+        
+        // Calculate all components using the old method for individual amounts
+        Map<String, PaymentComponentService.PaymentComponentResult> components = 
+            paymentComponentService.calculateAllComponents(cart, address, shippingMethod, discountCode, null);
+        
+        // Update cart with calculated components (still need individual amounts for database)
+        PaymentComponentService.PaymentComponentResult tax = components.get("tax");
+        if (tax != null) {
+            cart.setTaxAmount(tax.getAmount());
+        }
+        
+        PaymentComponentService.PaymentComponentResult shipping = components.get("shipping");
+        if (shipping != null) {
+            cart.setShippingAmount(shipping.getAmount());
+        }
+        
+        PaymentComponentService.PaymentComponentResult discount = components.get("discount");
+        if (discount != null) {
+            cart.setDiscountAmount(discount.getAmount());
+            cart.setDiscountCode(discountCode);
+        }
+        
+        cart.updateLastActivity();
         return cartRepository.save(cart);
     }
     

@@ -93,8 +93,8 @@ export default function CheckoutScreen() {
   // Payment method state
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('upi');
   
-  // Order summary collapse state
-  const [isOrderSummaryExpanded, setIsOrderSummaryExpanded] = useState(false);
+  // Order summary collapse state - expand by default on larger screens
+  const [isOrderSummaryExpanded, setIsOrderSummaryExpanded] = useState(screenHeight > 800);
   
   // Animation values for bottom sheet
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;

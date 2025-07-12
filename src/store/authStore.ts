@@ -18,6 +18,62 @@ const mapUserDtoToUser = (userDto: any, orders: Order[] = []) => ({
   orders,
 });
 
+// Helper function to decode JWT and check expiration
+const parseJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Failed to parse JWT token:', error);
+    return null;
+  }
+};
+
+// Helper function to set up automatic token refresh
+const setupTokenRefresh = (token: string) => {
+  try {
+    const decoded = parseJWT(token);
+    if (!decoded || !decoded.exp) {
+      console.error('Invalid token payload');
+      return;
+    }
+    
+    const expirationTime = decoded.exp * 1000; // Convert to milliseconds
+    const currentTime = Date.now();
+    const timeUntilExpiry = expirationTime - currentTime;
+    
+    // Refresh token 5 minutes before expiry
+    const refreshTime = timeUntilExpiry - (5 * 60 * 1000);
+    
+    if (refreshTime > 0) {
+      console.log(`🔐 Token will be refreshed in ${Math.round(refreshTime / 1000 / 60)} minutes`);
+      setTimeout(async () => {
+        try {
+          const { useAuthStore } = require('./authStore');
+          const { authService } = require('../services/authService');
+          
+          const currentToken = useAuthStore.getState().token;
+          if (currentToken) {
+            const response = await authService.refreshToken();
+            useAuthStore.getState().setToken(response.token);
+            setupTokenRefresh(response.token); // Set up next refresh
+          }
+        } catch (error) {
+          console.error('🔐 Automatic token refresh failed:', error);
+        }
+      }, refreshTime);
+    } else {
+      console.warn('🔐 Token is already expired or expires very soon');
+    }
+  } catch (error) {
+    console.error('Failed to set up token refresh:', error);
+  }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -28,14 +84,42 @@ export const useAuthStore = create<AuthState>()(
       
       initializeAuth: async () => {
         try {
+          // Wait a bit to ensure persisted state is loaded
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const { token, user, isAuthenticated } = get();
           
+          console.log('🔐 AuthStore: Initializing auth with:', { 
+            hasToken: !!token, 
+            hasUser: !!user, 
+            isAuthenticated 
+          });
+          
           if (token && user && isAuthenticated) {
+            // Check if token is expired
+            const decoded = parseJWT(token);
+            if (decoded && decoded.exp) {
+              const expirationTime = decoded.exp * 1000;
+              const currentTime = Date.now();
+              
+              if (currentTime >= expirationTime) {
+                console.log('🔐 AuthStore: Token is expired, clearing auth state');
+                set({ user: null, isAuthenticated: false, token: null });
+                setAuthToken(null);
+                return;
+              }
+            }
+            
+            console.log('🔐 AuthStore: Setting auth token from storage');
             setAuthToken(token);
+          } else {
+            console.log('🔐 AuthStore: No valid auth state found, clearing token');
+            setAuthToken(null);
           }
           
           // Register callback for auth state clearing on 401 errors
           setAuthStateCallback(() => {
+            console.log('🔐 AuthStore: Clearing auth state due to 401 error');
             // Clear auth state
             set({ user: null, isAuthenticated: false, token: null });
             
@@ -44,9 +128,15 @@ export const useAuthStore = create<AuthState>()(
             useAddressStore.getState().reset();
           });
           
+          // Set up automatic token refresh
+          if (token && user && isAuthenticated) {
+            setupTokenRefresh(token);
+          }
+          
         } catch (error) {
           console.error('Auth initialization failed:', error);
           set({ user: null, isAuthenticated: false, token: null });
+          setAuthToken(null);
         } finally {
           // Always set initializing to false when done
           set({ isInitializing: false });
@@ -64,6 +154,9 @@ export const useAuthStore = create<AuthState>()(
           // Convert to frontend format
           const user = mapUserDtoToUser(response.user, []);
           set({ user, isAuthenticated: true, token: response.token });
+          
+          // Set up automatic token refresh
+          setupTokenRefresh(response.token);
 
           // Merge guest cart after login
           try {
@@ -109,6 +202,9 @@ export const useAuthStore = create<AuthState>()(
             // Convert to frontend format
             const user = mapUserDtoToUser(response.user, []);
             set({ user, isAuthenticated: true, token: response.token });
+            
+            // Set up automatic token refresh
+            setupTokenRefresh(response.token);
             
             // Merge guest cart after registration
             try {
@@ -174,6 +270,34 @@ export const useAuthStore = create<AuthState>()(
       setToken: (token: string) => {
         setAuthToken(token);
         set({ token });
+        
+        // Set up automatic token refresh for new token
+        setupTokenRefresh(token);
+      },
+      
+      // Manual token refresh
+      refreshToken: async () => {
+        try {
+          const { token } = get();
+          if (!token) {
+            console.error('No token available for refresh');
+            return false;
+          }
+          
+          const response = await authService.refreshToken();
+          set({ token: response.token });
+          setAuthToken(response.token);
+          setupTokenRefresh(response.token);
+          
+          console.log('🔐 Manual token refresh successful');
+          return true;
+        } catch (error) {
+          console.error('🔐 Manual token refresh failed:', error);
+          // Clear auth state on refresh failure
+          set({ user: null, isAuthenticated: false, token: null });
+          setAuthToken(null);
+          return false;
+        }
       },
     }),
     {

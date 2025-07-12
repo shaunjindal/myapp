@@ -59,6 +59,9 @@ public class CartJpaEntity extends BaseJpaEntity {
     @Column(name = "shipping_amount", precision = 19, scale = 2)
     private BigDecimal shippingAmount = BigDecimal.ZERO;
     
+    @Column(name = "currency", length = 10)
+    private String currency = "USD";
+    
     @Column(name = "device_fingerprint", length = 255)
     private String deviceFingerprint;
     
@@ -301,6 +304,14 @@ public class CartJpaEntity extends BaseJpaEntity {
     
     public void setLastActivityAt(LocalDateTime lastActivityAt) {
         this.lastActivityAt = lastActivityAt;
+    }
+    
+    public String getCurrency() {
+        return currency;
+    }
+    
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
     
     @Override

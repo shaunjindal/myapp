@@ -27,7 +27,15 @@ export const authService = {
   },
 
   refreshToken: async (): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/refresh');
+    // Get current token from auth store
+    const { useAuthStore } = require('../store/authStore');
+    const currentToken = useAuthStore.getState().token;
+    
+    if (!currentToken) {
+      throw new Error('No token available for refresh');
+    }
+    
+    const response = await api.post<AuthResponse>('/auth/refresh', { token: currentToken });
     return response;
   },
 

@@ -30,6 +30,8 @@ public class CartDto {
     private int uniqueItems;
     private boolean isGuestCart;
     private boolean hasDiscount;
+    private String currency;
+    private List<PaymentComponent> paymentComponents;
     
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime expiresAt;
@@ -237,6 +239,22 @@ public class CartDto {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public String getCurrency() {
+        return currency;
+    }
+    
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+    
+    public List<PaymentComponent> getPaymentComponents() {
+        return paymentComponents;
+    }
+    
+    public void setPaymentComponents(List<PaymentComponent> paymentComponents) {
+        this.paymentComponents = paymentComponents;
     }
     
     @Override

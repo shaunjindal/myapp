@@ -21,8 +21,10 @@ let onAuthStateCleared: (() => void) | null = null;
 export const setAuthToken = (token: string | null) => {
   authToken = token;
   if (token) {
+    console.log('🔐 ApiClient: Setting auth token in headers');
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
+    console.log('🔐 ApiClient: Clearing auth token from headers');
     delete apiClient.defaults.headers.common['Authorization'];
   }
 };
@@ -52,11 +54,8 @@ apiClient.interceptors.request.use(
         config.headers[key] = sessionHeaders[key];
       });
       
-      // Add auth token if available
-      const token = await getAuthToken();
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-      }
+      // Auth token is already set in headers via setAuthToken()
+      // No need to add it again here to avoid circular dependency
       
       return config;
     } catch (error) {
@@ -77,35 +76,47 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Handle 401 unauthorized errors
+    // Handle 401 unauthorized errors - try to refresh token first
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('🔑 401 Unauthorized - attempting token refresh');
       originalRequest._retry = true;
       
       try {
-        // Try to refresh token
         const newToken = await refreshAuthToken();
         if (newToken) {
+          console.log('🔑 Token refreshed successfully, retrying request');
           originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
-        // Redirect to login or handle auth failure
-        console.error('Token refresh failed:', refreshError);
-        await handleAuthFailure();
+        console.error('🔑 Token refresh failed:', refreshError);
       }
+      
+      // If refresh failed, clear auth state
+      console.log('🔑 Token refresh failed - clearing auth state');
+      clearAuthState();
+    }
+    
+    // Handle 403 forbidden errors - log but don't clear auth
+    if (error.response?.status === 403) {
+      console.log('🚫 403 Forbidden - access denied');
     }
     
     // Handle session-related errors
     if (error.response?.status === 400 && error.response?.data?.error === 'INVALID_SESSION') {
       try {
-        // Reset session and retry
+        // Reset session and retry once
         await sessionManager.resetSession();
         const sessionHeaders = await sessionManager.getSessionHeaders();
-        originalRequest.headers = {
-          ...originalRequest.headers,
-          ...sessionHeaders,
-        };
-        return apiClient(originalRequest);
+        
+        if (!originalRequest._sessionRetry) {
+          originalRequest._sessionRetry = true;
+          originalRequest.headers = {
+            ...originalRequest.headers,
+            ...sessionHeaders,
+          };
+          return apiClient(originalRequest);
+        }
       } catch (sessionError) {
         console.error('Session reset failed:', sessionError);
       }
@@ -115,31 +126,40 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Helper function to get auth token
-async function getAuthToken(): Promise<string | null> {
-  try {
-    // Get token from auth store
-    const { useAuthStore } = require('../store/authStore');
-    const token = useAuthStore.getState().token;
-    return token;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
+// Helper function to get auth token - removed to avoid circular dependency
+// Token is now managed directly via setAuthToken() function
 
 // Helper function to refresh auth token
 async function refreshAuthToken(): Promise<string | null> {
   try {
-    // Get auth service and try to refresh
-    const { authService } = require('../services/authService');
-    const response = await authService.refreshToken();
-    
-    // Update auth store with new token
+    // Get current token from auth store
     const { useAuthStore } = require('../store/authStore');
-    useAuthStore.getState().setToken(response.token);
+    const currentToken = useAuthStore.getState().token;
     
-    return response.token;
+    if (!currentToken) {
+      console.error('No current token available for refresh');
+      return null;
+    }
+    
+    // Create a separate axios instance to avoid interceptor loops
+    const refreshClient = axios.create({
+      baseURL: apiClient.defaults.baseURL,
+      timeout: 10000,
+    });
+    
+    // Call refresh endpoint with current token
+    const response = await refreshClient.post('/auth/refresh', { token: currentToken });
+    
+    if (response.data && response.data.token) {
+      // Update auth store with new token
+      useAuthStore.getState().setToken(response.data.token);
+      setAuthToken(response.data.token);
+      
+      console.log('🔑 Token refreshed successfully');
+      return response.data.token;
+    }
+    
+    return null;
   } catch (error) {
     console.error('Failed to refresh auth token:', error);
     return null;
