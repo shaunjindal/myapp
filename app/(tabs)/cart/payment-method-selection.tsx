@@ -11,6 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 import { useCartStore } from '../../../src/store/cartStore';
 import { useAddressStore } from '../../../src/store/addressStore';
 import { Button } from '../../../src/components/Button';
@@ -188,21 +189,21 @@ export default function PaymentMethodSelectionScreen() {
         <View style={styles.amountCard}>
           <View style={styles.amountRow}>
             <Text style={styles.amountLabel}>Total Amount</Text>
-            <Text style={styles.amountValue}>${finalTotal.toFixed(2)}</Text>
+            <Text style={styles.amountValue}>{formatPrice(finalTotal)}</Text>
           </View>
           <View style={styles.amountBreakdown}>
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Items ({items.length})</Text>
-              <Text style={styles.breakdownValue}>${subtotal.toFixed(2)}</Text>
+              <Text style={styles.breakdownValue}>{formatPrice(subtotal)}</Text>
             </View>
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Tax</Text>
-              <Text style={styles.breakdownValue}>${tax.toFixed(2)}</Text>
+              <Text style={styles.breakdownValue}>{formatPrice(tax)}</Text>
             </View>
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Shipping</Text>
               <Text style={styles.breakdownValue}>
-                {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                {shipping === 0 ? 'FREE' : formatPrice(shipping)}
               </Text>
             </View>
           </View>
@@ -246,7 +247,7 @@ export default function PaymentMethodSelectionScreen() {
 
       <View style={styles.footer}>
         <Button
-          title={selectedMethod === 'cod' ? `Place Order - $${finalTotal.toFixed(2)}` : `Pay $${finalTotal.toFixed(2)}`}
+          title={selectedMethod === 'cod' ? `Place Order - ${formatPrice(finalTotal)}` : `Pay ${formatPrice(finalTotal)}`}
           onPress={handleProceedToPayment}
           disabled={!selectedMethod}
           style={styles.proceedButton}

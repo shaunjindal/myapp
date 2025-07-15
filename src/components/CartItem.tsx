@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { CartItem as CartItemType } from '../types';
 import { theme } from '../styles/theme';
+import { formatPrice } from '../utils/currencyUtils';
 import { Ionicons } from '@expo/vector-icons';
 
 interface CartItemProps {
@@ -48,9 +49,9 @@ export const CartItem: React.FC<CartItemProps> = ({
         </View>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>${product.price}</Text>
-          {isDiscounted && (
-            <Text style={styles.originalPrice}>${product.originalPrice}</Text>
+          <Text style={styles.price}>{formatPrice(product.price)}</Text>
+          {isDiscounted && product.originalPrice && (
+            <Text style={styles.originalPrice}>{formatPrice(product.originalPrice)}</Text>
           )}
         </View>
 

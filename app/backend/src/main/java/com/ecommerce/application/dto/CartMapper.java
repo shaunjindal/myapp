@@ -104,6 +104,11 @@ public class CartMapper {
                 ? product.getImages().get(0) : null);
             dto.setProductSku(product.getSku());
             dto.setIsAvailable(product.isAvailable());
+            
+            // Set price component information from product
+            dto.setBaseAmount(product.getBaseAmount());
+            dto.setTaxRate(product.getTaxRate());
+            dto.setTaxAmount(product.getTaxAmount());
             dto.setIsPriceChanged(entity.isPriceChanged());
             
             // Set unavailability reason if product is not available

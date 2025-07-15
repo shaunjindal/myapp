@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
+import { formatPrice } from '../utils/currencyUtils';
 
 interface OrderItem {
   id: string;
@@ -19,27 +20,60 @@ interface OrderItem {
   totalPrice: number;
 }
 
+interface PaymentComponent {
+  type: string;
+  amount: number;
+  text: string;
+  isNegative?: boolean;
+}
+
 interface OrderDetailsOrderSummaryProps {
   items: OrderItem[];
   subtotal: number;
-  shippingAmount: number;
-  taxAmount: number;
-  discountAmount?: number;
+  paymentComponents?: PaymentComponent[]; // Use payment components from backend
   totalAmount: number;
+  currency?: string; // Add currency prop
   style?: any;
 }
 
 export function OrderDetailsOrderSummary({
   items,
   subtotal,
-  shippingAmount,
-  taxAmount,
-  discountAmount = 0,
+  paymentComponents,
   totalAmount,
+  currency = 'INR', // Default currency
   style,
 }: OrderDetailsOrderSummaryProps) {
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Helper function to get icon for different component types (consistent with cart)
+  const getComponentIcon = (type: string) => {
+    switch (type) {
+      case 'TAX':
+        return 'receipt-outline';
+      case 'SHIPPING':
+        return 'car-outline';
+      case 'DISCOUNT':
+        return 'gift-outline';
+      case 'FEE':
+        return 'card-outline';
+      default:
+        return 'calculator-outline';
+    }
+  };
+
+  // Helper function to get color for component type
+  const getComponentColor = (type: string, isNegative: boolean) => {
+    if (isNegative) return theme.colors.success[600];
+    
+    switch (type) {
+      case 'SHIPPING':
+        return theme.colors.success[600];
+      default:
+        return theme.colors.gray[500];
+    }
+  };
 
   const renderHeader = () => (
     <View style={styles.cardHeader}>
@@ -80,8 +114,8 @@ export function OrderDetailsOrderSummary({
             )}
             <Text style={styles.itemSku}>SKU: {item.productSku}</Text>
             <View style={styles.itemPriceRow}>
-              <Text style={styles.unitPrice}>${item.unitPrice.toFixed(2)} each</Text>
-              <Text style={styles.itemTotal}>${item.totalPrice.toFixed(2)}</Text>
+              <Text style={styles.unitPrice}>{formatPrice(item.unitPrice, currency)} each</Text>
+              <Text style={styles.itemTotal}>{formatPrice(item.totalPrice, currency)}</Text>
             </View>
           </View>
         </View>
@@ -102,47 +136,32 @@ export function OrderDetailsOrderSummary({
               <Ionicons name="calculator-outline" size={16} color={theme.colors.gray[500]} />
               <Text style={styles.summaryLabel}>Subtotal</Text>
             </View>
-            <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>{formatPrice(subtotal, currency)}</Text>
           </View>
           
-          <View style={styles.summaryItem}>
-            <View style={styles.summaryItemLeft}>
-              <Ionicons name="receipt-outline" size={16} color={theme.colors.gray[500]} />
-              <Text style={styles.summaryLabel}>Tax</Text>
-            </View>
-            <Text style={styles.summaryValue}>${taxAmount.toFixed(2)}</Text>
-          </View>
-          
-          <View style={styles.summaryItem}>
-            <View style={styles.summaryItemLeft}>
-              <Ionicons name="car-outline" size={16} color={theme.colors.success[600]} />
-              <Text style={styles.summaryLabel}>Shipping</Text>
-            </View>
-            <View style={styles.freeShippingContainer}>
-              {shippingAmount === 0 ? (
-                <>
+          {paymentComponents?.map((component, index) => (
+            <View key={index} style={styles.summaryItem}>
+              <View style={styles.summaryItemLeft}>
+                <Ionicons name={getComponentIcon(component.type)} size={16} color={getComponentColor(component.type, component.isNegative || false)} />
+                <Text style={styles.summaryLabel}>{component.text}</Text>
+              </View>
+              {component.type === 'SHIPPING' && component.amount === 0 ? (
+                <View style={styles.freeShippingContainer}>
                   <Text style={styles.freeShipping}>FREE</Text>
                   <View style={styles.freeShippingBadge}>
                     <Ionicons name="checkmark" size={12} color={theme.colors.success[600]} />
                   </View>
-                </>
+                </View>
               ) : (
-                <Text style={styles.summaryValue}>${shippingAmount.toFixed(2)}</Text>
+                <Text style={[
+                  styles.summaryValue,
+                  component.isNegative && { color: theme.colors.success[600] }
+                ]}>
+                  {component.isNegative ? '-' : ''}{formatPrice(component.amount, currency)}
+                </Text>
               )}
             </View>
-          </View>
-
-          {discountAmount > 0 && (
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryItemLeft}>
-                <Ionicons name="gift-outline" size={16} color={theme.colors.success[600]} />
-                <Text style={styles.summaryLabel}>Discount</Text>
-              </View>
-              <Text style={[styles.summaryValue, { color: theme.colors.success[600] }]}>
-                -${discountAmount.toFixed(2)}
-              </Text>
-            </View>
-          )}
+          ))}
         </View>
         
         <View style={styles.divider} />
@@ -153,7 +172,7 @@ export function OrderDetailsOrderSummary({
               <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
               <Text style={styles.totalLabel}>Total Amount</Text>
             </View>
-            <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(totalAmount, currency)}</Text>
           </View>
         </View>
       </View>

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { recommendationService, RecommendationType } from '../services/recommendationService';
 import { Product } from '../types';
 import { theme } from '../styles/theme';
+import { formatPrice } from '../utils/currencyUtils';
 
 interface RecommendationSectionProps {
   productId: string;
@@ -98,9 +99,9 @@ export const RecommendationSection: React.FC<RecommendationSectionProps> = ({
         )}
         
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>${item.price}</Text>
+          <Text style={styles.price}>{formatPrice(item.price)}</Text>
           {item.originalPrice && (item.originalPrice - item.price) > 0 && (
-            <Text style={styles.originalPrice}>${item.originalPrice}</Text>
+            <Text style={styles.originalPrice}>{formatPrice(item.originalPrice)}</Text>
           )}
         </View>
       </View>

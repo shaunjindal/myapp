@@ -20,6 +20,7 @@ import { LoginPromptBottomSheet } from '../../../src/components/LoginPromptBotto
 import { OrderSummary } from '../../../src/components/OrderSummary';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 
 export default function CartScreen() {
   const router = useRouter();
@@ -215,8 +216,8 @@ export default function CartScreen() {
                     </View>
                     
                     <View style={styles.itemPriceContainer}>
-                      <Text style={styles.unitPrice}>${item.product.price.toFixed(2)} each</Text>
-                      <Text style={styles.itemTotal}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+                      <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
+                      <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
                     </View>
                   </View>
                 </View>

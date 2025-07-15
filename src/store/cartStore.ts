@@ -32,7 +32,22 @@ const generateSessionId = (): string => {
 
 // Calculate totals from items and process payment components from backend
 const calculateTotals = (items: CartItem[], backendCart?: any) => {
-  const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  // Calculate subtotal from base amounts (excluding tax) to match backend
+  const subtotal = items.reduce((sum, item) => {
+    const product = item.product as any;
+    let baseAmount = product.baseAmount;
+    
+    // If baseAmount is not available, calculate it from price and taxRate
+    if (baseAmount === undefined || baseAmount === null) {
+      const taxRate = product.taxRate || 0;
+      const priceIncludesTax = taxRate > 0;
+      baseAmount = priceIncludesTax 
+        ? product.price / (1 + taxRate / 100)
+        : product.price;
+    }
+    
+    return sum + (baseAmount * item.quantity);
+  }, 0);
   
   // Process payment components from backend
   const paymentComponents = backendCart?.paymentComponents || [];
@@ -79,11 +94,14 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
     }
   });
   
-  // Calculate final total using backend amount or fallback calculation
-  const finalTotal = backendCart?.totalAmount || (subtotal + tax + shipping + fees - discount);
+  // Calculate final total - prefer our calculation when we have payment components
+  // This ensures correct totals even if backend totalAmount is incorrect
+  const hasPaymentComponents = paymentComponents && paymentComponents.length > 0;
+  const calculatedTotal = subtotal + tax + shipping + fees - discount;
+  const finalTotal = hasPaymentComponents ? calculatedTotal : (backendCart?.totalAmount || calculatedTotal);
   
   return {
-    total: subtotal, // Keep legacy total for backward compatibility
+    total: calculatedTotal, // Total should include tax + shipping + fees - discount
     subtotal,
     tax,
     shipping,
@@ -99,7 +117,7 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
     discountDescription,
     // Include full component list for advanced UI
     paymentComponents,
-    currency: backendCart?.currency || 'USD',
+    currency: backendCart?.currency || 'INR',
   };
 };
 
@@ -128,6 +146,10 @@ const convertApiCartToFrontend = (apiCart: any) => {
       stockQuantity: item.stockQuantity || 999, // Set reasonable default stock
       originalPrice: item.unitPrice,
       specifications: {},
+      // Price component fields from backend
+      baseAmount: item.baseAmount,
+      taxRate: item.taxRate,
+      taxAmount: item.taxAmount,
     },
     quantity: item.quantity || 0,
   }));
@@ -204,7 +226,7 @@ export const useCartStore = create<CartStoreState>()(
       shippingDescription: 'Shipping cost',
       discountDescription: 'Discount applied',
       paymentComponents: [],
-      currency: 'USD',
+      currency: 'INR',
       sessionId: null,
       deviceFingerprint: null,
       cartId: null,
@@ -375,7 +397,7 @@ export const useCartStore = create<CartStoreState>()(
             shippingDescription: 'Shipping cost',
             discountDescription: 'Discount applied',
             paymentComponents: [],
-            currency: 'USD',
+            currency: 'INR',
             cartId: null,
             isGuest: true,
             lastSyncAt: null,
@@ -488,12 +510,12 @@ export const useCartStore = create<CartStoreState>()(
           await cartService.clearCart();
           console.log('Cart cleared on backend');
           
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD', lastSyncAt: new Date() });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'INR', lastSyncAt: new Date() });
           await sessionManager.updateCartActivity(0);
         } catch (error) {
           console.error('Failed to clear cart:', error);
           // Still clear local state
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD' });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'INR' });
         }
       },
       
@@ -592,7 +614,7 @@ export const useCartStore = create<CartStoreState>()(
         } catch (error) {
           console.error('Failed to sync cart:', error);
           // If sync fails, just clear the cart
-          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'USD' });
+          set({ items: [], total: 0, subtotal: 0, tax: 0, shipping: 0, discount: 0, fees: 0, finalTotal: 0, paymentComponents: [], currency: 'INR' });
         }
       },
     }),

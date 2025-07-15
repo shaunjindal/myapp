@@ -3,12 +3,15 @@ package com.ecommerce.application.service;
 import com.ecommerce.application.dto.PaymentComponent;
 import com.ecommerce.domain.common.Address;
 import com.ecommerce.infrastructure.persistence.entity.CartJpaEntity;
+import com.ecommerce.infrastructure.persistence.entity.OrderJpaEntity;
+import com.ecommerce.infrastructure.persistence.entity.OrderItemJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.AddressJpaEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,21 +46,40 @@ public class PaymentComponentService {
     private static final BigDecimal EXPRESS_SHIPPING_RATE = new BigDecimal("19.99");
     
     /**
-     * Calculate tax for a cart
+     * Calculate tax for a cart using product-level tax rates
      */
     public PaymentComponentResult calculateTax(CartJpaEntity cart, AddressJpaEntity address) {
         logger.debug("Calculating tax for cart: {} with address: {}", cart.getId(), address != null ? address.getId() : "none");
         
-        BigDecimal subtotal = cart.getSubtotal();
-        BigDecimal taxRate = determineTaxRate(address);
-        BigDecimal taxAmount = subtotal.multiply(taxRate);
+        BigDecimal totalTaxAmount = BigDecimal.ZERO;
+        BigDecimal totalSubtotal = BigDecimal.ZERO;
         
-        String taxLabel = determineTaxLabel(address, taxRate);
-        String taxDescription = determineTaxDescription(address, taxRate);
+        // Calculate tax for each cart item using product's tax rate
+        for (var cartItem : cart.getItems()) {
+            var product = cartItem.getProduct();
+            BigDecimal itemSubtotal = product.getBaseAmount() != null ? 
+                product.getBaseAmount().multiply(BigDecimal.valueOf(cartItem.getQuantity())) :
+                cartItem.getUnitPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                
+            BigDecimal itemTaxAmount = product.getTaxAmount() != null ?
+                product.getTaxAmount().multiply(BigDecimal.valueOf(cartItem.getQuantity())) :
+                BigDecimal.ZERO;
+                
+            totalTaxAmount = totalTaxAmount.add(itemTaxAmount);
+            totalSubtotal = totalSubtotal.add(itemSubtotal);
+        }
         
-        logger.debug("Tax calculation result: rate={}, amount={}, label={}", taxRate, taxAmount, taxLabel);
+        // Calculate effective tax rate for display
+        BigDecimal effectiveTaxRate = totalSubtotal.compareTo(BigDecimal.ZERO) > 0 ?
+            totalTaxAmount.divide(totalSubtotal, 4, BigDecimal.ROUND_HALF_UP) : BigDecimal.ZERO;
         
-        return new PaymentComponentResult(taxAmount, taxLabel, taxDescription);
+        String taxLabel = determineTaxLabel(address, effectiveTaxRate);
+        String taxDescription = "Tax calculated per product rates";
+        
+        logger.debug("Product-level tax calculation result: amount={}, effective rate={}, label={}", 
+                    totalTaxAmount, effectiveTaxRate, taxLabel);
+        
+        return new PaymentComponentResult(totalTaxAmount, taxLabel, taxDescription);
     }
     
     /**
@@ -182,6 +204,65 @@ public class PaymentComponentService {
             if (fee.getAmount().compareTo(BigDecimal.ZERO) > 0) {
                 components.add(new PaymentComponent("FEE", fee.getAmount(), fee.getLabel()));
             }
+        }
+        
+        return components;
+    }
+    
+    /**
+     * Calculate all payment components as a list of PaymentComponent DTOs for orders
+     */
+    public List<PaymentComponent> calculateOrderPaymentComponentsList(OrderJpaEntity order, AddressJpaEntity address, 
+                                                                    String shippingMethod, String discountCode, 
+                                                                    String paymentMethod) {
+        List<PaymentComponent> components = new ArrayList<>();
+        
+        // For orders, calculate detailed tax information from order items
+        BigDecimal totalTaxAmount = BigDecimal.ZERO;
+        BigDecimal totalBaseAmount = BigDecimal.ZERO;
+        
+        // Calculate tax from individual order items for better accuracy
+        for (OrderItemJpaEntity item : order.getItems()) {
+            if (item.getBaseAmount() != null && item.getTaxRate() != null) {
+                BigDecimal itemBaseTotal = item.getBaseAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                BigDecimal itemTaxAmount = item.getTaxAmount() != null ? item.getTaxAmount() : 
+                    itemBaseTotal.multiply(item.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                
+                totalBaseAmount = totalBaseAmount.add(itemBaseTotal);
+                totalTaxAmount = totalTaxAmount.add(itemTaxAmount);
+            }
+        }
+        
+        // Use calculated tax or fallback to stored tax amount
+        BigDecimal taxToUse = totalTaxAmount.compareTo(BigDecimal.ZERO) > 0 ? totalTaxAmount : order.getTaxAmount();
+        
+        if (taxToUse != null && taxToUse.compareTo(BigDecimal.ZERO) > 0) {
+            // Calculate effective tax rate for display
+            String taxLabel = "Tax";
+            if (totalBaseAmount.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal effectiveRate = taxToUse.multiply(BigDecimal.valueOf(100))
+                    .divide(totalBaseAmount, 2, RoundingMode.HALF_UP);
+                taxLabel = String.format("Tax (%.1f%%)", effectiveRate.doubleValue());
+            }
+            
+            components.add(new PaymentComponent("TAX", taxToUse, taxLabel));
+        }
+        
+        // Shipping component
+        if (order.getShippingAmount() != null) {
+            if (order.getShippingAmount().compareTo(BigDecimal.ZERO) > 0) {
+                components.add(new PaymentComponent("SHIPPING", order.getShippingAmount(), "Shipping"));
+            } else {
+                // Show free shipping
+                components.add(new PaymentComponent("SHIPPING", BigDecimal.ZERO, "Free Shipping"));
+            }
+        }
+        
+        // Discount component
+        if (order.getDiscountAmount() != null && order.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+            String discountLabel = order.getDiscountCode() != null ? 
+                "Discount (" + order.getDiscountCode() + ")" : "Discount";
+            components.add(new PaymentComponent("DISCOUNT", order.getDiscountAmount(), discountLabel, true));
         }
         
         return components;

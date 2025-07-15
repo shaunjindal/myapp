@@ -22,6 +22,10 @@ public class OrderItemDto {
     private BigDecimal productWeight;
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
+    
+    // Price component fields
+    private BigDecimal baseAmount;
+    private BigDecimal taxRate;
     private LocalDateTime addedAt;
     private boolean isGift;
     private String giftMessage;
@@ -234,5 +238,22 @@ public class OrderItemDto {
             name.append(productName);
         }
         return name.toString().trim();
+    }
+
+    // Price component getters and setters
+    public BigDecimal getBaseAmount() {
+        return baseAmount;
+    }
+
+    public void setBaseAmount(BigDecimal baseAmount) {
+        this.baseAmount = baseAmount;
+    }
+
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
     }
 } 

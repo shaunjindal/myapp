@@ -64,6 +64,9 @@ public class OrderJpaEntity extends BaseJpaEntity {
     @Column(name = "discount_code", length = 50)
     private String discountCode;
 
+    @Column(name = "currency", length = 10)
+    private String currency = "INR";
+
     // Billing Address (embedded)
     @Embedded
     @AttributeOverrides({
@@ -258,6 +261,14 @@ public class OrderJpaEntity extends BaseJpaEntity {
 
     public void setDiscountCode(String discountCode) {
         this.discountCode = discountCode;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public EmbeddableAddress getBillingAddress() {

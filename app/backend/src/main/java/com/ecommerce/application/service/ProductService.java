@@ -98,6 +98,15 @@ public class ProductService {
         existingProduct.setSku(updatedProduct.getSku());
         existingProduct.setPrice(updatedProduct.getPrice());
         existingProduct.setOriginalPrice(updatedProduct.getOriginalPrice());
+        
+        // Update price component fields
+        if (updatedProduct.getBaseAmount() != null && updatedProduct.getTaxRate() != null) {
+            existingProduct.updatePriceComponents(updatedProduct.getBaseAmount(), updatedProduct.getTaxRate());
+        } else {
+            existingProduct.setBaseAmount(updatedProduct.getBaseAmount());
+            existingProduct.setTaxRate(updatedProduct.getTaxRate());
+            existingProduct.setTaxAmount(updatedProduct.getTaxAmount());
+        }
         existingProduct.setBrand(updatedProduct.getBrand());
         existingProduct.setWeight(updatedProduct.getWeight());
         existingProduct.setDimensions(updatedProduct.getDimensions());
@@ -557,6 +566,21 @@ public class ProductService {
 
         if (product.getPrice() == null || product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Product price must be greater than zero");
+        }
+
+        // Validate price components if provided
+        if (product.getBaseAmount() != null) {
+            if (product.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Base amount must be greater than zero");
+            }
+            
+            if (product.getTaxRate() == null) {
+                throw new IllegalArgumentException("Tax rate is required when base amount is provided");
+            }
+            
+            if (product.getTaxRate().compareTo(BigDecimal.ZERO) < 0 || product.getTaxRate().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("Tax rate must be between 0 and 100 percent");
+            }
         }
 
         if (product.getBrand() == null || product.getBrand().trim().isEmpty()) {

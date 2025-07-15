@@ -42,6 +42,23 @@ public class Product extends AuditableEntity {
     @Digits(integer = 10, fraction = 2, message = "Original price must have at most 10 integer digits and 2 fractional digits")
     private BigDecimal originalPrice;
     
+    // Price component fields for tax calculation
+    @NotNull(message = "Base amount is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Base amount must be greater than 0")
+    @Digits(integer = 10, fraction = 2, message = "Base amount must have at most 10 integer digits and 2 fractional digits")
+    private BigDecimal baseAmount;
+
+    @NotNull(message = "Tax rate is required")
+    @DecimalMin(value = "0.0", message = "Tax rate must be greater than or equal to 0")
+    @DecimalMax(value = "100.0", message = "Tax rate must not exceed 100%")
+    @Digits(integer = 3, fraction = 2, message = "Tax rate must have at most 3 integer digits and 2 fractional digits")
+    private BigDecimal taxRate;
+
+    @NotNull(message = "Tax amount is required")
+    @DecimalMin(value = "0.0", message = "Tax amount must be greater than or equal to 0")
+    @Digits(integer = 10, fraction = 2, message = "Tax amount must have at most 10 integer digits and 2 fractional digits")
+    private BigDecimal taxAmount;
+    
     @NotNull(message = "Category is required")
     private Category category;
     
@@ -91,15 +108,32 @@ public class Product extends AuditableEntity {
         this.reviewCount = 0;
     }
     
-    // Constructor for creating a new product
+    // Constructor for creating a new product (backward compatibility - treats price as final price with 0 tax)
     public Product(String name, String description, String sku, BigDecimal price, Category category, String brand) {
         this();
         this.name = name;
         this.description = description;
         this.sku = sku;
         this.price = price;
+        this.baseAmount = price; // Assume no tax for backward compatibility
+        this.taxRate = BigDecimal.ZERO;
+        this.taxAmount = BigDecimal.ZERO;
         this.category = category;
         this.brand = brand;
+    }
+
+    // Constructor for creating a new product with price components
+    public Product(String name, String description, String sku, BigDecimal baseAmount, BigDecimal taxRate, Category category, String brand) {
+        this();
+        this.name = name;
+        this.description = description;
+        this.sku = sku;
+        this.baseAmount = baseAmount;
+        this.taxRate = taxRate;
+        this.category = category;
+        this.brand = brand;
+        calculateTaxAmount();
+        calculateFinalPrice();
     }
     
     // Business methods
@@ -212,6 +246,30 @@ public class Product extends AuditableEntity {
         this.reviewCount = totalReviews;
     }
     
+    // Price component calculation methods
+    public void calculateTaxAmount() {
+        if (baseAmount != null && taxRate != null) {
+            this.taxAmount = baseAmount.multiply(taxRate).divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+        }
+    }
+
+    public void calculateFinalPrice() {
+        if (baseAmount != null && taxAmount != null) {
+            this.price = baseAmount.add(taxAmount);
+        }
+    }
+
+    public void updatePriceComponents(BigDecimal baseAmount, BigDecimal taxRate) {
+        this.baseAmount = baseAmount;
+        this.taxRate = taxRate;
+        calculateTaxAmount();
+        calculateFinalPrice();
+    }
+
+    public BigDecimal getFinalPrice() {
+        return baseAmount != null && taxAmount != null ? baseAmount.add(taxAmount) : price;
+    }
+    
     // Getters and Setters
     public String getName() {
         return name;
@@ -259,6 +317,34 @@ public class Product extends AuditableEntity {
     
     public void setOriginalPrice(BigDecimal originalPrice) {
         this.originalPrice = originalPrice;
+    }
+    
+    public BigDecimal getBaseAmount() {
+        return baseAmount;
+    }
+
+    public void setBaseAmount(BigDecimal baseAmount) {
+        this.baseAmount = baseAmount;
+        calculateTaxAmount();
+        calculateFinalPrice();
+    }
+
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
+        calculateTaxAmount();
+        calculateFinalPrice();
+    }
+
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
     }
     
     public Category getCategory() {

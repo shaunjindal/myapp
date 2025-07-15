@@ -130,10 +130,17 @@ public class OrderService {
             orderItem.setGift(cartItem.getIsGift() != null ? cartItem.getIsGift() : false);
             orderItem.setGiftMessage(cartItem.getGiftMessage());
             orderItem.setCustomAttributes(cartItem.getCustomAttributes());
+            
+            // Set price component fields from product
+            orderItem.setBaseAmount(product.getBaseAmount());
+            orderItem.setTaxRate(product.getTaxRate());
+            orderItem.setTaxAmount(product.getTaxAmount().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
 
             order.addItem(orderItem);
             
-            subtotal = subtotal.add(orderItem.getTotalPrice());
+            // Calculate subtotal from base amounts (excluding tax)
+            BigDecimal itemBaseTotal = orderItem.getBaseAmount().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+            subtotal = subtotal.add(itemBaseTotal);
             totalWeight = totalWeight.add(orderItem.getTotalWeight());
 
             // Reserve product stock
@@ -222,9 +229,16 @@ public class OrderService {
             OrderItemJpaEntity orderItem = new OrderItemJpaEntity(order, product, 
                 itemRequest.getQuantity(), product.getPrice());
 
+            // Set price component fields from product
+            orderItem.setBaseAmount(product.getBaseAmount());
+            orderItem.setTaxRate(product.getTaxRate());
+            orderItem.setTaxAmount(product.getTaxAmount().multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+
             order.addItem(orderItem);
             
-            subtotal = subtotal.add(orderItem.getTotalPrice());
+            // Calculate subtotal from base amounts (excluding tax)
+            BigDecimal itemBaseTotal = orderItem.getBaseAmount().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+            subtotal = subtotal.add(itemBaseTotal);
             totalWeight = totalWeight.add(orderItem.getTotalWeight());
 
             // Reserve product stock

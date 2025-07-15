@@ -28,6 +28,7 @@ import { AddAddressModal } from '../../../src/components/AddAddressModal';
 import { OrderSummary } from '../../../src/components/OrderSummary';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../src/styles/theme';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 import { AddressDto } from '../../../src/types/api';
 import orderService from '../../../src/services/orderService';
 import { PaymentMethod } from '../../../src/types/order';
@@ -549,7 +550,7 @@ export default function CheckoutScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          title={loading || isPaymentLoading ? 'Processing...' : `Pay $${finalTotal.toFixed(2)}`}
+          title={loading || isPaymentLoading ? 'Processing...' : `Pay ${formatPrice(finalTotal)}`}
           onPress={handleProceedToPayment}
           disabled={loading || isPaymentLoading}
           variant="primary"

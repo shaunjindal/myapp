@@ -70,6 +70,13 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
     @Column(name = "tax_amount", precision = 10, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
+    // Price component fields for proper tax calculation
+    @Column(name = "base_amount", precision = 10, scale = 2)
+    private BigDecimal baseAmount;
+
+    @Column(name = "tax_rate", precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
     @Column(name = "added_at", nullable = false)
     private LocalDateTime addedAt = LocalDateTime.now();
 
@@ -281,5 +288,21 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
 
     public void setCustomAttributes(String customAttributes) {
         this.customAttributes = customAttributes;
+    }
+
+    public BigDecimal getBaseAmount() {
+        return baseAmount;
+    }
+
+    public void setBaseAmount(BigDecimal baseAmount) {
+        this.baseAmount = baseAmount;
+    }
+
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
     }
 } 

@@ -13,6 +13,7 @@ import { recommendationService } from '../../../src/services/recommendationServi
 import { mapProductDtoToProduct } from '../../../src/types/api';
 import { Product } from '../../../src/types';
 import { RecommendationSection } from '../../../src/components/RecommendationSection';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -281,8 +282,7 @@ export default function ProductDetailScreen() {
             <View style={styles.priceSection}>
               <View style={styles.priceContainer}>
                 <View style={styles.currentPriceRow}>
-                  <Text style={styles.currencySymbol}>$</Text>
-                  <Text style={styles.price}>{product.price}</Text>
+                  <Text style={styles.price}>{formatPrice(product.price)}</Text>
                   {product.originalPrice && (product.originalPrice - product.price) > 0 && (
                     <View style={styles.discountBadge}>
                       <Text style={styles.discountText}>
@@ -293,9 +293,9 @@ export default function ProductDetailScreen() {
                 </View>
                 {product.originalPrice && (product.originalPrice - product.price) > 0 && (
                   <View style={styles.originalPriceRow}>
-                    <Text style={styles.originalPrice}>Was ${product.originalPrice}</Text>
+                    <Text style={styles.originalPrice}>Was {formatPrice(product.originalPrice)}</Text>
                     <Text style={styles.savings}>
-                      You save ${(product.originalPrice - product.price).toFixed(2)}
+                      You save {formatPrice(product.originalPrice - product.price)}
                     </Text>
                   </View>
                 )}

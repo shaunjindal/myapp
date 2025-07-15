@@ -63,6 +63,10 @@ export interface ProductDto {
   description: string;
   price: number;
   originalPrice?: number;
+  // Price component fields
+  baseAmount?: number;
+  taxRate?: number;
+  taxAmount?: number;
   sku: string;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK' | 'DISCONTINUED';
   stockQuantity: number;
@@ -152,6 +156,10 @@ export interface CartItemDto {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  // Price component fields from product
+  baseAmount?: number;
+  taxRate?: number;
+  taxAmount?: number;
   addedAt: string;
 }
 
@@ -275,6 +283,10 @@ export const mapProductDtoToProduct = (productDto: any) => ({
   name: productDto.name,
   price: productDto.price,
   originalPrice: productDto.originalPrice || productDto.price,
+  // Price component fields
+  baseAmount: productDto.baseAmount,
+  taxRate: productDto.taxRate,
+  taxAmount: productDto.taxAmount,
   image: productDto.imageUrl || productDto.images?.[0] || '',
   images: productDto.images || [productDto.imageUrl || ''],
   description: productDto.description,

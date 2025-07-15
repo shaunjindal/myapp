@@ -236,10 +236,9 @@ export default function OrderDetailsScreen() {
     <OrderDetailsOrderSummary
       items={order?.items || []}
       subtotal={order?.subtotal || 0}
-      shippingAmount={order?.shippingAmount || 0}
-      taxAmount={order?.taxAmount || 0}
-      discountAmount={order?.discountAmount || 0}
+      paymentComponents={order?.paymentComponents || []}
       totalAmount={order?.totalAmount || 0}
+      currency={order?.currency || "INR"}
       style={styles.orderSummaryCard}
     />
   );

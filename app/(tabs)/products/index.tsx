@@ -267,13 +267,15 @@ export default function ProductsScreen() {
           <Text style={styles.resultsText}>
             {filteredProducts.length} products found
           </Text>
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onPress={() => router.push(`/(tabs)/products/${product.id}`)}
-            />
-          ))}
+          <View style={styles.productsContainer}>
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onPress={() => router.push(`/(tabs)/products/${product.id}`)}
+              />
+            ))}
+          </View>
         </View>
       </ScrollView>
 
@@ -466,5 +468,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text.inverse,
     fontSize: theme.typography.sizes.base,
     fontWeight: '600',
+  },
+  productsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: theme.spacing.sm,
   },
 }); 

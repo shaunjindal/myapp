@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 import { useCartStore } from '../../../src/store/cartStore';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useAddressStore } from '../../../src/store/addressStore';
@@ -352,26 +353,26 @@ export default function PaymentScreen() {
               <View key={item.id} style={styles.orderItem}>
                 <Text style={styles.itemName}>{item.product.name}</Text>
                 <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+                <Text style={styles.itemPrice}>{formatPrice(item.product.price * item.quantity)}</Text>
               </View>
             ))}
             
             <View style={styles.orderSummary}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal:</Text>
-                <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>{formatPrice(subtotal)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Tax:</Text>
-                <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>{formatPrice(tax)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Shipping:</Text>
-                <Text style={styles.summaryValue}>${shipping.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>{formatPrice(shipping)}</Text>
               </View>
               <View style={[styles.summaryRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total:</Text>
-                <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
+                <Text style={styles.totalValue}>{formatPrice(finalTotal)}</Text>
               </View>
             </View>
           </View>
@@ -424,7 +425,7 @@ export default function PaymentScreen() {
 
       <View style={styles.footer}>
         <Button
-          title={isProcessing ? 'Processing...' : `Pay $${finalTotal.toFixed(2)}`}
+          title={isProcessing ? 'Processing...' : `Pay ${formatPrice(finalTotal)}`}
           onPress={handlePayment}
           disabled={isProcessing || isPaymentLoading}
           style={styles.payButton}

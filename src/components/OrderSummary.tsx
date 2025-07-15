@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
+import { formatPrice } from '../utils/currencyUtils';
 import { useCartStore } from '../store/cartStore';
 
 interface OrderSummaryItem {
@@ -19,6 +20,8 @@ interface OrderSummaryItem {
     price: number;
     image: string;
     brand?: string;
+    baseAmount?: number;
+    taxAmount?: number;
   };
 }
 
@@ -74,7 +77,7 @@ export function OrderSummary({
           <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
           <Text style={styles.collapsedTotalLabel}>Total Amount</Text>
         </View>
-        <Text style={styles.collapsedTotalValue}>${finalTotal.toFixed(2)}</Text>
+        <Text style={styles.collapsedTotalValue}>{formatPrice(finalTotal)}</Text>
       </View>
     </View>
   );
@@ -102,8 +105,15 @@ export function OrderSummary({
                   </View>
                 )}
                 <View style={styles.itemPriceRow}>
-                  <Text style={styles.unitPrice}>${item.product.price.toFixed(2)} each</Text>
-                  <Text style={styles.itemTotal}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+                  {item.product.baseAmount && item.product.taxAmount ? (
+                    <View style={styles.priceBreakdown}>
+                      <Text style={styles.basePrice}>Base: {formatPrice(item.product.baseAmount)} each</Text>
+                      <Text style={styles.taxPrice}>Tax: {formatPrice(item.product.taxAmount)} each</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
+                  )}
+                  <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
                 </View>
               </View>
             </View>
@@ -118,7 +128,7 @@ export function OrderSummary({
               <Ionicons name="calculator-outline" size={16} color={theme.colors.gray[500]} />
               <Text style={styles.summaryLabel}>Subtotal</Text>
             </View>
-            <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>{formatPrice(subtotal)}</Text>
           </View>
           
           <View style={styles.summaryItem}>
@@ -126,7 +136,7 @@ export function OrderSummary({
               <Ionicons name="receipt-outline" size={16} color={theme.colors.gray[500]} />
               <Text style={styles.summaryLabel}>Tax (8%)</Text>
             </View>
-            <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>{formatPrice(tax)}</Text>
           </View>
           
           <View style={styles.summaryItem}>
@@ -143,7 +153,7 @@ export function OrderSummary({
                   </View>
                 </>
               ) : (
-                <Text style={styles.summaryValue}>${shipping.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>{formatPrice(shipping)}</Text>
               )}
             </View>
           </View>
@@ -157,7 +167,7 @@ export function OrderSummary({
               <Ionicons name="card-outline" size={20} color={theme.colors.primary[600]} />
               <Text style={styles.totalLabel}>Total Amount</Text>
             </View>
-            <Text style={styles.totalValue}>${finalTotal.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(finalTotal)}</Text>
           </View>
         </View>
       </View>
@@ -334,6 +344,18 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.base,
     fontWeight: '600',
     color: theme.colors.text.primary,
+  },
+  priceBreakdown: {
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+  },
+  basePrice: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+  },
+  taxPrice: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
   },
   brandContainer: {
     alignSelf: 'flex-start',

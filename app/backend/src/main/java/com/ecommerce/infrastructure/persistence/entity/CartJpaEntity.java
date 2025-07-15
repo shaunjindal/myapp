@@ -60,7 +60,7 @@ public class CartJpaEntity extends BaseJpaEntity {
     private BigDecimal shippingAmount = BigDecimal.ZERO;
     
     @Column(name = "currency", length = 10)
-    private String currency = "USD";
+    private String currency = "INR";
     
     @Column(name = "device_fingerprint", length = 255)
     private String deviceFingerprint;
@@ -115,8 +115,14 @@ public class CartJpaEntity extends BaseJpaEntity {
     }
     
     public BigDecimal getSubtotal() {
+        // Calculate subtotal from base amounts (excluding tax)
         return items.stream()
-                .map(CartItemJpaEntity::getTotalPrice)
+                .map(item -> {
+                    ProductJpaEntity product = item.getProduct();
+                    BigDecimal baseAmount = product.getBaseAmount() != null ? 
+                        product.getBaseAmount() : item.getUnitPrice();
+                    return baseAmount.multiply(BigDecimal.valueOf(item.getQuantity()));
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
     

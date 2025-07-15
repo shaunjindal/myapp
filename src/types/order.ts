@@ -23,6 +23,13 @@ export enum PaymentMethod {
   RAZORPAY_UPI = 'RAZORPAY_UPI',
 }
 
+export interface PaymentComponent {
+  type: string;
+  amount: number;
+  text: string;
+  isNegative?: boolean;
+}
+
 export interface CreateOrderRequest {
   billingAddressId: string;
   shippingAddressId: string;
@@ -50,6 +57,8 @@ export interface OrderDto {
   shippingAmount: number;
   totalAmount: number;
   discountCode?: string;
+  currency?: string;
+  paymentComponents?: PaymentComponent[];
   billingAddress: AddressDto;
   shippingAddress: AddressDto;
   paymentMethod: PaymentMethod;
@@ -102,6 +111,9 @@ export interface OrderItemDto {
   discountAmount?: number;
   taxAmount?: number;
   addedAt: string;
+  // Price component fields
+  baseAmount?: number;
+  taxRate?: number;
   isGift: boolean;
   giftMessage?: string;
   customAttributes?: string;

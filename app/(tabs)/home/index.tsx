@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useProductStore } from '../../../src/store/productStore';
@@ -17,6 +18,9 @@ import { ProductCard } from '../../../src/components/ProductCard';
 import { Button } from '../../../src/components/Button';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -40,7 +44,7 @@ export default function HomeScreen() {
     }
   }, [products.length, isInitialLoad]);
 
-  const featuredProducts = products.slice(0, 4);
+  const featuredProducts = products.slice(0, 6); // Show fewer but more prominent products
   console.log('🏠 HomeScreen: Featured products for display:', featuredProducts?.length || 0);
 
   const handleProductPress = (productId: string) => {
@@ -53,6 +57,70 @@ export default function HomeScreen() {
       params: { category: categoryId },
     });
   };
+
+  const renderHeroFeaturedProduct = (product: any, index: number) => (
+    <TouchableOpacity
+      key={product.id}
+      style={[
+        styles.heroProductCard,
+        { marginLeft: index === 0 ? theme.spacing.xl : 0 }
+      ]}
+      onPress={() => handleProductPress(product.id)}
+      activeOpacity={0.9}
+    >
+      <ImageBackground
+        source={{ uri: product.image }}
+        style={styles.heroProductImage}
+        imageStyle={styles.heroProductImageStyle}
+      >
+        <View style={styles.heroProductOverlay}>
+          <View style={styles.heroProductHeader}>
+            {product.discount > 0 && (
+              <View style={styles.heroDiscountBadge}>
+                <Text style={styles.heroDiscountText}>-{product.discount}%</Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.heroProductInfo}>
+            <Text style={styles.heroProductCategory}>
+              {product.category || 'Featured'}
+            </Text>
+            <Text style={styles.heroProductName} numberOfLines={2}>
+              {product.name}
+            </Text>
+            
+            <View style={styles.heroProductPricing}>
+              <Text style={styles.heroProductPrice}>
+                {formatPrice(product.price)}
+              </Text>
+              {product.originalPrice > product.price && (
+                <Text style={styles.heroProductOriginalPrice}>
+                  {formatPrice(product.originalPrice)}
+                </Text>
+              )}
+            </View>
+            
+            <View style={styles.heroProductRating}>
+              <View style={styles.heroStarsContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons
+                    key={star}
+                    name={star <= (product.rating || 4.5) ? "star" : "star-outline"}
+                    size={14}
+                    color={theme.colors.warning[400]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.heroProductRatingText}>
+                {product.rating || 4.5} ({product.reviews || 128})
+              </Text>
+            </View>
+          </View>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
 
   // Show loading state for initial load
   if (isInitialLoad && (loading || products.length === 0)) {
@@ -121,40 +189,19 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Special Offer</Text>
-            <Text style={styles.heroSubtitle}>Up to 50% off on selected items</Text>
-            <Button
-              title="Shop Now"
-              onPress={() => router.push('/products')}
-              variant="secondary"
-              size="md"
-            />
-          </View>
-          <View style={styles.heroImageContainer}>
-            <Ionicons name="gift" size={60} color={theme.colors.secondary[400]} />
-          </View>
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Ionicons name="cube" size={24} color={theme.colors.primary[600]} />
-            <Text style={styles.statNumber}>{products.length}</Text>
-            <Text style={styles.statLabel}>Products</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="grid" size={24} color={theme.colors.success[600]} />
-            <Text style={styles.statNumber}>{categories.length}</Text>
-            <Text style={styles.statLabel}>Categories</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="star" size={24} color={theme.colors.warning[500]} />
-            <Text style={styles.statNumber}>4.8</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
+        {/* Hero Featured Products Carousel */}
+        <View style={styles.heroFeaturedSection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.heroCarouselContainer}
+            decelerationRate="fast"
+            snapToInterval={screenWidth * 0.8}
+            snapToAlignment="start"
+            pagingEnabled={false}
+          >
+            {featuredProducts.map(renderHeroFeaturedProduct)}
+          </ScrollView>
         </View>
 
         {/* Categories */}
@@ -194,16 +241,16 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Featured Products */}
-        <View style={styles.featuredSection}>
+        {/* More Products */}
+        <View style={styles.moreProductsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Featured Products</Text>
+            <Text style={styles.sectionTitle}>More Products</Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/products')}>
               <Text style={styles.seeAllLink}>See All</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.productsContainer}>
-            {featuredProducts.map((product) => (
+            {products.slice(6, 10).map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -268,66 +315,110 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
   },
-  heroSection: {
-    backgroundColor: theme.colors.primary[600],
-    marginHorizontal: theme.spacing.xl,
+  
+  // Hero Featured Section
+  heroFeaturedSection: {
     marginTop: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
+  },
+  heroCarouselContainer: {
+    paddingRight: theme.spacing.xl,
+  },
+  heroProductCard: {
+    width: screenWidth * 0.8,
+    height: 420,
+    marginRight: theme.spacing.lg,
     borderRadius: theme.borderRadius['2xl'],
+    overflow: 'hidden',
+    ...theme.shadows.xl,
+  },
+  heroProductImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'space-between',
+  },
+  heroProductImageStyle: {
+    borderRadius: theme.borderRadius['2xl'],
+  },
+  heroProductOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'space-between',
     padding: theme.spacing.xl,
+  },
+  heroProductHeader: {
+    alignItems: 'flex-start',
+  },
+  heroDiscountBadge: {
+    backgroundColor: theme.colors.error[500],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  heroDiscountText: {
+    color: 'white',
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '700' as any,
+  },
+
+  heroProductInfo: {
+    width: '100%',
+  },
+  heroProductCategory: {
+    fontSize: theme.typography.sizes.xs,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600' as any,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: theme.spacing.xs,
+  },
+  heroProductName: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: '700' as any,
+    color: 'white',
+    marginBottom: theme.spacing.sm,
+    lineHeight: 24,
+  },
+  heroProductPricing: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    ...theme.shadows.lg,
-  },
-  heroContent: {
-    flex: 1,
-  },
-  heroTitle: {
-    fontSize: theme.typography.sizes['3xl'],
-    fontWeight: '800' as any,
-    color: theme.colors.text.inverse,
     marginBottom: theme.spacing.sm,
   },
-  heroSubtitle: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.primary[100],
-    marginBottom: theme.spacing.lg,
-    fontWeight: '500' as any,
-  },
-  heroImageContainer: {
-    marginLeft: theme.spacing.lg,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: theme.spacing.xl,
-    marginTop: theme.spacing.xl,
-  },
-  statCard: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: theme.spacing.xs,
-    ...theme.shadows.md,
-  },
-  statNumber: {
+  heroProductPrice: {
     fontSize: theme.typography.sizes['2xl'],
-    fontWeight: '700' as any,
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing.sm,
+    fontWeight: '800' as any,
+    color: 'white',
   },
-  statLabel: {
+  heroProductOriginalPrice: {
+    fontSize: theme.typography.sizes.base,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textDecorationLine: 'line-through',
+    marginLeft: theme.spacing.sm,
+  },
+  heroProductRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroStarsContainer: {
+    flexDirection: 'row',
+    marginRight: theme.spacing.sm,
+  },
+  heroProductRatingText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500' as any,
-    marginTop: theme.spacing.xs,
   },
+  
+  // Regular sections
   categoriesSection: {
-    marginTop: theme.spacing['4xl'],
+    marginTop: theme.spacing['2xl'],
   },
-  featuredSection: {
+  moreProductsSection: {
     marginTop: theme.spacing['3xl'],
   },
   sectionHeader: {
@@ -352,7 +443,7 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     width: 140,
-    height: 160, // Fixed height to ensure content fits
+    height: 160,
     marginRight: theme.spacing.lg,
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
@@ -392,6 +483,10 @@ const styles = StyleSheet.create({
   },
   productsContainer: {
     paddingHorizontal: theme.spacing.xl,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: theme.spacing.sm,
   },
   bottomSpacer: {
     height: theme.spacing['3xl'],

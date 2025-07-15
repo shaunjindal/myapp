@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 import { useCartStore } from '../../../src/store/cartStore';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useOrderStore } from '../../../src/store/orderStore';
@@ -232,7 +233,7 @@ export default function PaymentProcessingOnlineScreen() {
               <Text style={styles.paymentMethodName}>
                 {getPaymentMethodDisplayName(paymentMethod || 'razorpay_card')}
               </Text>
-              <Text style={styles.paymentAmount}>${finalAmount.toFixed(2)}</Text>
+              <Text style={styles.paymentAmount}>{formatPrice(finalAmount)}</Text>
             </View>
           </View>
         </View>
@@ -323,7 +324,7 @@ export default function PaymentProcessingOnlineScreen() {
       {step === 0 && (
         <View style={styles.footer}>
           <Button
-            title={`Pay $${finalAmount.toFixed(2)}`}
+            title={`Pay ${formatPrice(finalAmount)}`}
             onPress={initiatePaymentProcess}
             disabled={isPaymentLoading}
             variant="primary"

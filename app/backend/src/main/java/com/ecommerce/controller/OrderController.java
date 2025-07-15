@@ -5,6 +5,7 @@ import com.ecommerce.application.dto.OrderDto;
 import com.ecommerce.application.dto.OrderItemDto;
 import com.ecommerce.application.dto.OrderStatusHistoryDto;
 import com.ecommerce.application.service.OrderService;
+import com.ecommerce.application.service.PaymentComponentService;
 import com.ecommerce.domain.order.OrderStatus;
 import com.ecommerce.domain.order.PaymentMethod;
 import com.ecommerce.infrastructure.persistence.entity.OrderJpaEntity;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import com.ecommerce.application.dto.PaymentComponent;
 
 /**
  * REST Controller for Order management
@@ -47,6 +49,9 @@ public class OrderController {
     
     @Autowired
     private UserJpaRepository userRepository;
+    
+    @Autowired
+    private PaymentComponentService paymentComponentService;
 
     // Order Creation Endpoints
 
@@ -423,6 +428,12 @@ public class OrderController {
         dto.setTotalWeight(order.getTotalWeight());
         dto.setCreatedAt(order.getCreatedAt());
         dto.setUpdatedAt(order.getUpdatedAt());
+        dto.setCurrency(order.getCurrency());
+
+        // Calculate payment components dynamically for order
+        List<PaymentComponent> paymentComponents = paymentComponentService.calculateOrderPaymentComponentsList(
+            order, null, null, order.getDiscountCode(), null);
+        dto.setPaymentComponents(paymentComponents);
 
         // Convert shipping address
         if (order.getShippingAddress() != null) {
@@ -496,6 +507,10 @@ public class OrderController {
         dto.setDiscountAmount(item.getDiscountAmount());
         dto.setTaxAmount(item.getTaxAmount());
         dto.setAddedAt(item.getAddedAt());
+        
+        // Price component fields
+        dto.setBaseAmount(item.getBaseAmount());
+        dto.setTaxRate(item.getTaxRate());
         dto.setGift(item.isGift());
         dto.setGiftMessage(item.getGiftMessage());
         dto.setCustomAttributes(item.getCustomAttributes());

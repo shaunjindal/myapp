@@ -22,6 +22,8 @@ public class OrderDto {
     private BigDecimal shippingAmount;
     private BigDecimal totalAmount;
     private String discountCode;
+    private String currency;
+    private List<PaymentComponent> paymentComponents;
     private AddressDto billingAddress;
     private AddressDto shippingAddress;
     private PaymentMethod paymentMethod;
@@ -124,6 +126,22 @@ public class OrderDto {
 
     public void setDiscountCode(String discountCode) {
         this.discountCode = discountCode;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public List<PaymentComponent> getPaymentComponents() {
+        return paymentComponents;
+    }
+
+    public void setPaymentComponents(List<PaymentComponent> paymentComponents) {
+        this.paymentComponents = paymentComponents;
     }
 
     public AddressDto getBillingAddress() {

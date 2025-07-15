@@ -3,6 +3,10 @@ export interface Product {
   name: string;
   price: number;
   originalPrice?: number;
+  // Price component fields
+  baseAmount?: number;
+  taxRate?: number;
+  taxAmount?: number;
   image: string;
   images: string[];
   description: string;

@@ -24,6 +24,11 @@ public class CartItemDto {
     private BigDecimal originalPrice;
     private BigDecimal discountAmount;
     private BigDecimal savingsAmount;
+    
+    // Price component fields from product
+    private BigDecimal baseAmount;
+    private BigDecimal taxRate;
+    private BigDecimal taxAmount;
     private Boolean isGift;
     private String giftMessage;
     private Boolean isAvailable;
@@ -158,6 +163,30 @@ public class CartItemDto {
     
     public void setSavingsAmount(BigDecimal savingsAmount) {
         this.savingsAmount = savingsAmount;
+    }
+    
+    public BigDecimal getBaseAmount() {
+        return baseAmount;
+    }
+    
+    public void setBaseAmount(BigDecimal baseAmount) {
+        this.baseAmount = baseAmount;
+    }
+    
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+    
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
+    }
+    
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+    
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
     }
     
     public Boolean getIsGift() {
