@@ -22,6 +22,7 @@ interface OrderSummaryItem {
     brand?: string;
     baseAmount?: number;
     taxAmount?: number;
+    originalPrice?: number; // Added for discount tracking
   };
 }
 
@@ -79,6 +80,9 @@ export function OrderSummary({
         </View>
         <Text style={styles.collapsedTotalValue}>{formatPrice(finalTotal)}</Text>
       </View>
+      <View style={styles.collapsedTaxNote}>
+        <Text style={styles.collapsedTaxNoteText}>Includes all applicable taxes</Text>
+      </View>
     </View>
   );
 
@@ -107,11 +111,40 @@ export function OrderSummary({
                 <View style={styles.itemPriceRow}>
                   {item.product.baseAmount && item.product.taxAmount ? (
                     <View style={styles.priceBreakdown}>
-                      <Text style={styles.basePrice}>Base: {formatPrice(item.product.baseAmount)} each</Text>
-                      <Text style={styles.taxPrice}>Tax: {formatPrice(item.product.taxAmount)} each</Text>
+                      {/* Show simplified price breakdown without separate tax */}
+                      {(() => {
+                        const hasDiscount = item.product.originalPrice && item.product.originalPrice > item.product.price;
+                        const discountAmount = hasDiscount ? (item.product.originalPrice! - item.product.price) : 0;
+                        
+                        return (
+                          <>
+                            {hasDiscount && discountAmount > 0 && (
+                              <>
+                                <Text style={styles.basePrice}>Was: {formatPrice(item.product.originalPrice!)} each</Text>
+                                <Text style={styles.discountPrice}>
+                                  Save: -{formatPrice(discountAmount)} each
+                                </Text>
+                              </>
+                            )}
+                            <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each (incl. tax)</Text>
+                          </>
+                        );
+                      })()}
                     </View>
                   ) : (
-                    <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
+                    <View style={styles.priceBreakdown}>
+                      {/* Fallback for items without detailed breakdown */}
+                      {item.product.originalPrice && item.product.originalPrice > item.product.price ? (
+                        <>
+                          <Text style={styles.basePrice}>Was: {formatPrice(item.product.originalPrice)} each</Text>
+                          <Text style={styles.discountPrice}>
+                            Save: -{formatPrice(item.product.originalPrice - item.product.price)} each
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each (incl. tax)</Text>
+                      )}
+                    </View>
                   )}
                   <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
                 </View>
@@ -128,15 +161,7 @@ export function OrderSummary({
               <Ionicons name="calculator-outline" size={16} color={theme.colors.gray[500]} />
               <Text style={styles.summaryLabel}>Subtotal</Text>
             </View>
-            <Text style={styles.summaryValue}>{formatPrice(subtotal)}</Text>
-          </View>
-          
-          <View style={styles.summaryItem}>
-            <View style={styles.summaryItemLeft}>
-              <Ionicons name="receipt-outline" size={16} color={theme.colors.gray[500]} />
-              <Text style={styles.summaryLabel}>Tax (8%)</Text>
-            </View>
-            <Text style={styles.summaryValue}>{formatPrice(tax)}</Text>
+            <Text style={styles.summaryValue}>{formatPrice(finalTotal - shipping)}</Text>
           </View>
           
           <View style={styles.summaryItem}>
@@ -157,6 +182,12 @@ export function OrderSummary({
               )}
             </View>
           </View>
+        </View>
+        
+        {/* Tax-inclusive information */}
+        <View style={styles.taxInclusiveNote}>
+          <Ionicons name="information-circle-outline" size={16} color={theme.colors.gray[500]} />
+          <Text style={styles.taxInclusiveText}>All prices include applicable taxes</Text>
         </View>
         
         <View style={styles.divider} />
@@ -357,6 +388,11 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
   },
+  discountPrice: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.success[600],
+    fontWeight: '500',
+  },
   brandContainer: {
     alignSelf: 'flex-start',
     marginTop: theme.spacing.xs,
@@ -448,5 +484,29 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.xl,
     fontWeight: '700',
     color: theme.colors.primary[600],
+  },
+  taxInclusiveNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: theme.borderRadius.lg,
+  },
+  taxInclusiveText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.gray[700],
+    fontWeight: '500',
+  },
+  collapsedTaxNote: {
+    paddingTop: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  collapsedTaxNoteText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.gray[600],
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
 }); 
