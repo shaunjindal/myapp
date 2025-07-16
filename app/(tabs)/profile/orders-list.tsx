@@ -16,6 +16,7 @@ import { useOrderStore } from '../../../src/store/orderStore';
 import orderService from '../../../src/services/orderService';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 
 export default function OrdersListScreen() {
   const router = useRouter();
@@ -137,7 +138,7 @@ export default function OrdersListScreen() {
                 <Text style={styles.orderDate}>
                   {new Date(order.createdAt).toLocaleDateString()}
                 </Text>
-                <Text style={styles.orderTotal}>${(order.totalAmount || 0).toFixed(2)}</Text>
+                <Text style={styles.orderTotal}>{formatPrice(order.totalAmount || 0)}</Text>
                 <View style={styles.orderItems}>
                   {(order.items || []).slice(0, 2).map((item) => (
                     <Text key={item.id} style={styles.orderItem}>

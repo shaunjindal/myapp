@@ -103,6 +103,7 @@ public class CartMapper {
             dto.setProductImageUrl(product.getImages() != null && !product.getImages().isEmpty() 
                 ? product.getImages().get(0) : null);
             dto.setProductSku(product.getSku());
+            dto.setProductBrand(product.getBrand()); // Add brand mapping
             dto.setIsAvailable(product.isAvailable());
             
             // Set price component information from product

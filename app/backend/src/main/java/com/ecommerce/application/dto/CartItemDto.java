@@ -18,6 +18,7 @@ public class CartItemDto {
     private String productName;
     private String productImageUrl;
     private String productSku;
+    private String productBrand; // Add brand field
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal totalPrice;
@@ -115,6 +116,14 @@ public class CartItemDto {
     
     public void setProductSku(String productSku) {
         this.productSku = productSku;
+    }
+    
+    public String getProductBrand() {
+        return productBrand;
+    }
+    
+    public void setProductBrand(String productBrand) {
+        this.productBrand = productBrand;
     }
     
     public Integer getQuantity() {

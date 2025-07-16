@@ -19,6 +19,7 @@ import { BackButtonHeader } from '../../../src/components/BackButtonHeader';
 import { ViewDetailsButton } from '../../../src/components/ViewDetailsButton';
 import { theme } from '../../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { formatPrice } from '../../../src/utils/currencyUtils';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -58,9 +59,9 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <BackButtonHeader title="Profile" />
-        <View style={styles.initializingContainer}>
+        <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary[600]} />
-          <Text style={styles.initializingText}>Loading profile...</Text>
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
     );
@@ -70,14 +71,22 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <BackButtonHeader title="Profile" />
-        <View style={styles.notLoggedInContainer}>
-          <Ionicons name="person-circle" size={80} color="#6b7280" />
-          <Text style={styles.notLoggedInText}>Please login to view your profile</Text>
-          <Button
-            title="Login"
-            onPress={() => router.push('/login')}
-            size="lg"
-          />
+        <View style={styles.centerContainer}>
+          <View style={styles.emptyStateCard}>
+            <View style={styles.emptyStateIcon}>
+              <Ionicons name="person-circle-outline" size={80} color={theme.colors.gray[400]} />
+            </View>
+            <Text style={styles.emptyStateTitle}>Welcome!</Text>
+            <Text style={styles.emptyStateText}>Please login to view your profile and access your orders</Text>
+            <View style={styles.emptyStateAction}>
+              <Button
+                title="Login to Continue"
+                onPress={() => router.push('/login')}
+                size="lg"
+                fullWidth
+              />
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -87,103 +96,139 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <BackButtonHeader title="Profile" />
 
-      <ScrollView style={styles.scrollView}>
-        {/* User Info */}
-        <View style={styles.userContainer}>
-          <Image
-            source={{ uri: user?.avatar || 'https://via.placeholder.com/80' }}
-            style={styles.avatar}
-          />
-          <Text style={styles.userName}>{user?.name}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* User Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: user?.avatar || 'https://via.placeholder.com/80' }}
+                style={styles.avatar}
+              />
+              <View style={styles.statusBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success[600]} />
+              </View>
+            </View>
+                         <View style={styles.userInfo}>
+               <Text style={styles.userName}>{user?.name}</Text>
+               <Text style={styles.userEmail}>{user?.email}</Text>
+             </View>
+          </View>
         </View>
 
-        {/* Order History */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Orders</Text>
+        {/* Recent Orders Card */}
+        <View style={styles.sectionCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.headerContent}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="receipt-outline" size={20} color={theme.colors.primary[600]} />
+              </View>
+              <Text style={styles.cardTitle}>Recent Orders</Text>
+            </View>
             {recentOrder && (
               <TouchableOpacity 
                 style={styles.viewMoreButton}
                 onPress={() => router.push('/(tabs)/profile/orders-list')}
               >
-                <Text style={styles.viewMoreText}>View More</Text>
-                <Ionicons name="chevron-forward" size={16} color="#2563eb" />
+                <Text style={styles.viewMoreText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary[600]} />
               </TouchableOpacity>
             )}
           </View>
+
           {recentOrderLoading ? (
             <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.primary[600]} />
               <Text style={styles.loadingText}>Loading orders...</Text>
             </View>
           ) : recentOrder ? (
             <TouchableOpacity 
               style={styles.orderCard}
               onPress={() => router.push(`/(tabs)/profile/order-details?orderId=${recentOrder.id}`)}
+              activeOpacity={0.7}
             >
               <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>Order #{recentOrder.orderNumber || recentOrder.id}</Text>
-                <Text style={[styles.orderStatus, { color: getStatusColor(recentOrder.status) }]}>
-                  {recentOrder.status.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={styles.orderDate}>
-                {new Date(recentOrder.createdAt).toLocaleDateString()}
-              </Text>
-              <Text style={styles.orderTotal}>${(recentOrder.totalAmount || 0).toFixed(2)}</Text>
-              <View style={styles.orderItems}>
-                {(recentOrder.items || []).slice(0, 2).map((item) => (
-                  <Text key={item.id} style={styles.orderItem}>
-                    {item.productName || 'Unknown Product'} x{item.quantity || 0}
+                <View style={styles.orderInfo}>
+                  <Text style={styles.orderId}>#{recentOrder.orderNumber || recentOrder.id}</Text>
+                  <Text style={styles.orderDate}>
+                    {new Date(recentOrder.createdAt).toLocaleDateString()}
                   </Text>
-                ))}
-                {(recentOrder.items || []).length > 2 && (
-                  <Text style={styles.orderItem}>
-                    +{(recentOrder.items || []).length - 2} more items
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(recentOrder.status) + '20' }]}>
+                  <Text style={[styles.statusText, { color: getStatusColor(recentOrder.status) }]}>
+                    {recentOrder.status.toUpperCase()}
                   </Text>
-                )}
+                </View>
               </View>
-              <ViewDetailsButton />
+              
+              <View style={styles.orderContent}>
+                <Text style={styles.orderTotal}>{formatPrice(recentOrder.totalAmount || 0)}</Text>
+                <View style={styles.orderItems}>
+                  {(recentOrder.items || []).slice(0, 2).map((item) => (
+                    <View key={item.id} style={styles.orderItem}>
+                      <Text style={styles.orderItemText}>
+                        {item.productName || 'Unknown Product'} × {item.quantity || 0}
+                      </Text>
+                    </View>
+                  ))}
+                  {(recentOrder.items || []).length > 2 && (
+                    <Text style={styles.moreItemsText}>
+                      +{(recentOrder.items || []).length - 2} more items
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.orderFooter}>
+                <ViewDetailsButton />
+              </View>
             </TouchableOpacity>
           ) : (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="receipt-outline" size={48} color="#6b7280" />
+            <View style={styles.emptyState}>
+              <Ionicons name="bag-outline" size={48} color={theme.colors.gray[400]} />
+              <Text style={styles.emptyStateTitle}>No Orders Yet</Text>
               <Text style={styles.emptyStateText}>
-                {recentOrderError || "No orders found"}
+                {recentOrderError || "Start shopping to see your orders here"}
               </Text>
               <TouchableOpacity 
-                style={styles.startShoppingButton}
+                style={styles.emptyStateButton}
                 onPress={() => router.push('/(tabs)/products/')}
               >
-                <Text style={styles.startShoppingText}>Start Shopping</Text>
+                <Text style={styles.emptyStateButtonText}>Start Shopping</Text>
+                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary[600]} />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Addresses */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Addresses</Text>
+        {/* Addresses Card */}
+        <View style={styles.sectionCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.headerContent}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="location-outline" size={20} color={theme.colors.primary[600]} />
+              </View>
+              <Text style={styles.cardTitle}>My Addresses</Text>
+            </View>
             {addresses && addresses.length > 0 && (
               <TouchableOpacity 
                 style={styles.viewMoreButton}
                 onPress={() => router.push('/(tabs)/profile/addresses-list')}
               >
-                <Text style={styles.viewMoreText}>Manage Addresses</Text>
-                <Ionicons name="chevron-forward" size={16} color="#2563eb" />
+                <Text style={styles.viewMoreText}>Manage</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary[600]} />
               </TouchableOpacity>
             )}
           </View>
           
           {addressesLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary[600]} />
+              <ActivityIndicator size="small" color={theme.colors.primary[600]} />
               <Text style={styles.loadingText}>Loading addresses...</Text>
             </View>
           ) : addressesError ? (
             <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={24} color="#ef4444" />
+              <Ionicons name="alert-circle-outline" size={24} color={theme.colors.error[500]} />
               <Text style={styles.errorText}>{addressesError}</Text>
             </View>
           ) : addresses && addresses.length > 0 ? (
@@ -191,45 +236,56 @@ export default function ProfileScreen() {
               {addresses.slice(0, 1).map((address: any) => (
                 <View key={address.id} style={styles.addressCard}>
                   <View style={styles.addressHeader}>
-                    <Text style={styles.addressType}>{address.type.toUpperCase()}</Text>
+                    <View style={styles.addressTypeContainer}>
+                      <Ionicons 
+                        name={address.type === 'home' ? 'home' : address.type === 'work' ? 'business' : 'location'} 
+                        size={16} 
+                        color={theme.colors.primary[600]} 
+                      />
+                      <Text style={styles.addressType}>{address.type.charAt(0).toUpperCase() + address.type.slice(1)}</Text>
+                    </View>
                     {address.isDefault && (
-                      <Text style={styles.defaultBadge}>DEFAULT</Text>
+                      <View style={styles.defaultBadge}>
+                        <Text style={styles.defaultBadgeText}>DEFAULT</Text>
+                      </View>
                     )}
                   </View>
                   <Text style={styles.addressText}>
-                    {address.street}, {address.city}, {address.state} {address.zipCode}
+                    {address.street}
+                  </Text>
+                  <Text style={styles.addressLocation}>
+                    {address.city}, {address.state} {address.zipCode}
                   </Text>
                   <Text style={styles.addressCountry}>{address.country}</Text>
                 </View>
               ))}
             </>
           ) : (
-            <View style={styles.emptyAddressContainer}>
-              <Ionicons name="location-outline" size={48} color="#6b7280" />
-              <Text style={styles.emptyAddressText}>
-                {addressesMessage || "No addresses added yet"}
-              </Text>
-              <Text style={styles.emptyAddressSubtext}>
-                Add your first delivery address to start shopping
+            <View style={styles.emptyState}>
+              <Ionicons name="location-outline" size={48} color={theme.colors.gray[400]} />
+              <Text style={styles.emptyStateTitle}>No Addresses</Text>
+              <Text style={styles.emptyStateText}>
+                {addressesMessage || "Add your first delivery address to start shopping"}
               </Text>
               <TouchableOpacity 
-                style={styles.addAddressButton}
+                style={styles.emptyStateButton}
                 onPress={() => router.push('/(tabs)/profile/addresses-list')}
               >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.addAddressText}>Add Address</Text>
+                <Ionicons name="add" size={16} color={theme.colors.primary[600]} />
+                <Text style={styles.emptyStateButtonText}>Add Address</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Account Actions */}
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color="#ef4444" />
-            <Text style={styles.actionButtonText}>Logout</Text>
+        {/* Logout Button */}
+        <View style={styles.logoutContainer}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color={theme.colors.error[600]} />
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -238,309 +294,342 @@ export default function ProfileScreen() {
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'delivered':
-      return '#10b981';
+      return theme.colors.success[600];
     case 'processing':
     case 'pending':
-      return '#f59e0b';
+      return theme.colors.warning[600];
     case 'shipped':
     case 'confirmed':
     case 'paid':
-      return '#3b82f6';
+      return theme.colors.primary[600];
     case 'cancelled':
     case 'refunded':
-      return '#ef4444';
+      return theme.colors.error[600];
     default:
-      return '#6b7280';
+      return theme.colors.gray[600];
   }
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: theme.colors.surface,
   },
   scrollView: {
     flex: 1,
   },
-  notLoggedInContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: theme.spacing.xl,
   },
-  notLoggedInText: {
-    fontSize: 18,
-    color: '#6b7280',
-    marginTop: 16,
-    marginBottom: 24,
+  loadingText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    marginTop: theme.spacing.md,
     textAlign: 'center',
   },
-  userContainer: {
-    backgroundColor: '#ffffff',
+
+  // Empty State Card
+  emptyStateCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    padding: theme.spacing['2xl'],
     alignItems: 'center',
-    padding: 20,
-    marginBottom: 20,
+    width: '100%',
+    ...theme.shadows.md,
+  },
+  emptyStateIcon: {
+    marginBottom: theme.spacing.lg,
+  },
+  emptyStateTitle: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
+  },
+  emptyStateAction: {
+    width: '100%',
+  },
+
+  // Profile Card
+  profileCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    margin: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.xl,
+    ...theme.shadows.md,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: theme.spacing.lg,
   },
   avatar: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    marginBottom: 16,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.gray[100],
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.full,
+    padding: 2,
+  },
+  userInfo: {
+    flex: 1,
   },
   userName: {
-    fontSize: 24,
+    fontSize: theme.typography.sizes['2xl'],
     fontWeight: '700',
-    color: '#374151',
-    marginBottom: 4,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
   },
   userEmail: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.sm,
   },
-  section: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    marginBottom: 20,
+  
+
+  // Section Card
+  sectionCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius['2xl'],
+    margin: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.lg,
+    ...theme.shadows.md,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.lg,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  cardTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    flex: 1,
   },
   viewMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
   },
   viewMoreText: {
-    fontSize: 16,
-    color: '#2563eb',
-    marginRight: 4,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.primary[600],
+    marginRight: theme.spacing.xs,
     fontWeight: '600',
   },
+
+  // Loading and Error States
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  errorText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.error[600],
+    marginLeft: theme.spacing.sm,
+  },
+
+  // Order Card
   orderCard: {
-    backgroundColor: '#f9fafb',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.md,
+  },
+  orderInfo: {
+    flex: 1,
   },
   orderId: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  orderStatus: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
   },
   orderDate: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+  },
+  statusText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  orderContent: {
+    marginBottom: theme.spacing.lg,
   },
   orderTotal: {
-    fontSize: 18,
+    fontSize: theme.typography.sizes.xl,
     fontWeight: '700',
-    color: '#2563eb',
-    marginBottom: 8,
+    color: theme.colors.success[600],
+    marginBottom: theme.spacing.sm,
   },
   orderItems: {
-    marginTop: 8,
+    gap: theme.spacing.xs,
   },
   orderItem: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 2,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
   },
+  orderItemText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.primary,
+  },
+  moreItemsText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontStyle: 'italic',
+  },
+  orderFooter: {
+    alignItems: 'flex-end',
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing['2xl'],
+  },
+  emptyStateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary[50],
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    marginTop: theme.spacing.md,
+  },
+  emptyStateButtonText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.primary[600],
+    fontWeight: '600',
+    marginLeft: theme.spacing.xs,
+  },
+
+  // Address Card
   addressCard: {
-    backgroundColor: '#f9fafb',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
   },
   addressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.md,
+  },
+  addressTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addressType: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.base,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.colors.text.primary,
+    marginLeft: theme.spacing.sm,
   },
   defaultBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10b981',
+    backgroundColor: theme.colors.success[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+  },
+  defaultBadgeText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.success[700],
+    fontWeight: '700',
   },
   addressText: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+    lineHeight: 22,
+  },
+  addressLocation: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.xs,
   },
   addressCountry: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
   },
-  signOutContainer: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 20,
+
+  // Logout Button
+  logoutContainer: {
+    margin: theme.spacing.lg,
+    marginTop: theme.spacing.md,
   },
-  signOutButton: {
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: theme.colors.error[50],
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.xl,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: theme.colors.error[200],
   },
-  signOutText: {
-    fontSize: 16,
-    color: '#ef4444',
+  logoutButtonText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.error[600],
     fontWeight: '600',
-    marginLeft: 8,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
-  },
-  emptyStateContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-    lineHeight: 24,
-  },
-  startShoppingButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 6,
-  },
-  startShoppingText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyAddressContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyAddressText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyAddressSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  addAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary[600],
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    shadowColor: theme.colors.primary[600],
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  addAddressText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#ef4444',
-    marginLeft: 8,
-    flex: 1,
-  },
-  initializingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  initializingText: {
-    fontSize: 18,
-    color: '#6b7280',
-    marginTop: 16,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    color: '#ef4444',
-    fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: theme.spacing.sm,
   },
 }); 

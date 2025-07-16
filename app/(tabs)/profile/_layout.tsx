@@ -11,7 +11,8 @@ export default function ProfileLayout() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.push('/(tabs)/profile');
+      // If no back history, go to home page
+      router.replace('/(tabs)/home');
     }
   };
 

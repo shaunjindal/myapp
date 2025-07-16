@@ -118,32 +118,18 @@ export function OrderDetailsOrderSummary({
             )}
             <Text style={styles.itemSku}>SKU: {item.productSku}</Text>
             <View style={styles.itemPriceRow}>
-              {item.baseAmount && item.taxAmount ? (
-                <View style={styles.priceBreakdown}>
-                  {/* Show detailed price breakdown when available */}
-                  <Text style={styles.basePrice}>Base: {formatPrice(item.baseAmount, currency)} each</Text>
-                  {item.discountAmount && item.discountAmount > 0 && (
+              <View style={styles.priceBreakdown}>
+                {/* Show simplified pricing without tax/base breakdown */}
+                {item.discountAmount && item.discountAmount > 0 ? (
+                  <>
+                    <Text style={styles.basePrice}>Was: {formatPrice(item.unitPrice + item.discountAmount, currency)} each</Text>
                     <Text style={styles.discountPrice}>
-                      Discount: -{formatPrice(item.discountAmount, currency)} each
+                      Save: -{formatPrice(item.discountAmount, currency)} each
                     </Text>
-                  )}
-                  <Text style={styles.taxPrice}>Tax: {formatPrice(item.taxAmount, currency)} each</Text>
-                </View>
-              ) : (
-                <View style={styles.priceBreakdown}>
-                  {/* Fallback to simple unit price display */}
-                  {item.discountAmount && item.discountAmount > 0 ? (
-                    <>
-                      <Text style={styles.basePrice}>Was: {formatPrice(item.unitPrice + item.discountAmount, currency)} each</Text>
-                      <Text style={styles.discountPrice}>
-                        Save: -{formatPrice(item.discountAmount, currency)} each
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.unitPrice}>{formatPrice(item.unitPrice, currency)} each</Text>
-                  )}
-                </View>
-              )}
+                  </>
+                ) : null}
+                <Text style={styles.unitPrice}>{formatPrice(item.unitPrice, currency)} each (incl. tax)</Text>
+              </View>
               <Text style={styles.itemTotal}>{formatPrice(item.totalPrice, currency)}</Text>
             </View>
           </View>
@@ -345,10 +331,6 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.success[600],
     fontWeight: '500',
-  },
-  taxPrice: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
   },
   summaryContent: {
     gap: theme.spacing.xs,
