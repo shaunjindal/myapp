@@ -43,6 +43,14 @@ public interface CartItemJpaRepository extends JpaRepository<CartItemJpaEntity, 
     @Query("SELECT ci FROM CartItemJpaEntity ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId")
     Optional<CartItemJpaEntity> findByCartIdAndProductId(@Param("cartId") String cartId, @Param("productId") String productId);
     
+    // Find cart items by cart, product, and custom length (for variable dimension products)
+    @Query("SELECT ci FROM CartItemJpaEntity ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId AND ci.customLength = :customLength")
+    Optional<CartItemJpaEntity> findByCartIdAndProductIdAndCustomLength(@Param("cartId") String cartId, @Param("productId") String productId, @Param("customLength") BigDecimal customLength);
+    
+    // Find cart items by cart and product with null custom length (for regular products)
+    @Query("SELECT ci FROM CartItemJpaEntity ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId AND ci.customLength IS NULL")
+    Optional<CartItemJpaEntity> findByCartIdAndProductIdWithNullCustomLength(@Param("cartId") String cartId, @Param("productId") String productId);
+    
     // Find cart items by specific criteria
     @Query("SELECT ci FROM CartItemJpaEntity ci WHERE ci.cart.id = :cartId AND ci.isGift = true")
     List<CartItemJpaEntity> findGiftItemsByCartId(@Param("cartId") String cartId);

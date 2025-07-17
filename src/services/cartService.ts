@@ -53,13 +53,13 @@ export const cartService = {
   },
 
   // Alternative endpoints for product-based operations
-  quickAddToCart: async (productId: string, quantity: number = 1): Promise<CartDto> => {
-    return cartService.addToCart({ productId, quantity });
+  quickAddToCart: async (productId: string, quantity: number = 1, customLength?: number): Promise<CartDto> => {
+    return cartService.addToCart({ productId, quantity, customLength });
   },
 
   // Alias for quickAddToCart to match hook expectations
-  addProductToCart: async (productId: string, quantity: number = 1): Promise<CartDto> => {
-    return cartService.addToCart({ productId, quantity });
+  addProductToCart: async (productId: string, quantity: number = 1, customLength?: number): Promise<CartDto> => {
+    return cartService.addToCart({ productId, quantity, customLength });
   },
 
   updateProductQuantity: async (productId: string, quantity: number): Promise<CartDto> => {

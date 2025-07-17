@@ -94,6 +94,20 @@ public class Product extends AuditableEntity {
     @Min(value = 0, message = "Review count cannot be negative")
     private Integer reviewCount;
     
+    // Variable dimension pricing fields
+    private boolean isVariableDimension = false;
+    
+    @DecimalMin(value = "0.0", inclusive = false, message = "Fixed height must be greater than 0")
+    private BigDecimal fixedHeight;
+    
+    @DecimalMin(value = "0.0", inclusive = false, message = "Variable dimension rate must be greater than 0")
+    private BigDecimal variableDimensionRate;
+    
+    @DecimalMin(value = "0.0", inclusive = false, message = "Max length must be greater than 0")
+    private BigDecimal maxLength;
+    
+    private DimensionUnit dimensionUnit;
+    
     // Default constructor
     public Product() {
         super();
@@ -268,6 +282,52 @@ public class Product extends AuditableEntity {
 
     public BigDecimal getFinalPrice() {
         return baseAmount != null && taxAmount != null ? baseAmount.add(taxAmount) : price;
+    }
+    
+    // Variable dimension business methods
+    public BigDecimal calculatePriceForLength(BigDecimal customLength) {
+        if (!isVariableDimension || fixedHeight == null || variableDimensionRate == null || customLength == null) {
+            return price; // Return regular price if not variable dimension
+        }
+        
+        if (customLength.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Custom length must be greater than 0");
+        }
+        
+        if (maxLength != null && customLength.compareTo(maxLength) > 0) {
+            throw new IllegalArgumentException("Custom length cannot exceed maximum length of " + maxLength + " " + dimensionUnit.getSymbol());
+        }
+        
+        // Calculate area: fixedHeight × customLength
+        BigDecimal area = fixedHeight.multiply(customLength);
+        
+        // Calculate final price: area × rate (rate already includes tax)
+        BigDecimal finalPrice = area.multiply(variableDimensionRate);
+        
+        return finalPrice;
+    }
+    
+    public boolean isValidCustomLength(BigDecimal customLength) {
+        if (!isVariableDimension || customLength == null) {
+            return false;
+        }
+        
+        return customLength.compareTo(BigDecimal.ZERO) > 0 && 
+               (maxLength == null || customLength.compareTo(maxLength) <= 0);
+    }
+    
+    public String getFormattedDimensionInfo() {
+        if (!isVariableDimension || fixedHeight == null || dimensionUnit == null) {
+            return "";
+        }
+        
+        return String.format("Fixed Height: %.2f %s, Max Length: %.2f %s, Rate: %.2f per sq %s", 
+            fixedHeight.doubleValue(), 
+            dimensionUnit.getSymbol(),
+            maxLength != null ? maxLength.doubleValue() : 0.0,
+            dimensionUnit.getSymbol(),
+            variableDimensionRate != null ? variableDimensionRate.doubleValue() : 0.0,
+            dimensionUnit.getSymbol());
     }
     
     // Getters and Setters
@@ -449,6 +509,47 @@ public class Product extends AuditableEntity {
     
     public void setReviewCount(Integer reviewCount) {
         this.reviewCount = reviewCount;
+    }
+    
+    // Variable dimension getters and setters
+    public boolean isVariableDimension() {
+        return isVariableDimension;
+    }
+    
+    public void setVariableDimension(boolean variableDimension) {
+        this.isVariableDimension = variableDimension;
+    }
+    
+    public BigDecimal getFixedHeight() {
+        return fixedHeight;
+    }
+    
+    public void setFixedHeight(BigDecimal fixedHeight) {
+        this.fixedHeight = fixedHeight;
+    }
+    
+    public BigDecimal getVariableDimensionRate() {
+        return variableDimensionRate;
+    }
+    
+    public void setVariableDimensionRate(BigDecimal variableDimensionRate) {
+        this.variableDimensionRate = variableDimensionRate;
+    }
+    
+    public BigDecimal getMaxLength() {
+        return maxLength;
+    }
+    
+    public void setMaxLength(BigDecimal maxLength) {
+        this.maxLength = maxLength;
+    }
+    
+    public DimensionUnit getDimensionUnit() {
+        return dimensionUnit;
+    }
+    
+    public void setDimensionUnit(DimensionUnit dimensionUnit) {
+        this.dimensionUnit = dimensionUnit;
     }
     
     @Override

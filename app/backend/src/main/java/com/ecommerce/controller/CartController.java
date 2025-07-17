@@ -89,10 +89,11 @@ public class CartController {
             String deviceFingerprint = StringUtils.hasText(request.getDeviceFingerprint()) ? 
                     request.getDeviceFingerprint() : cartService.generateDeviceFingerprint(httpRequest);
             
-            CartJpaEntity updatedCart = cartService.addItemToCart(cart.getId(), request.getProductId(), request.getQuantity());
+            CartJpaEntity updatedCart = cartService.addItemToCart(cart.getId(), request.getProductId(), request.getQuantity(), request.getCustomLength());
             CartDto cartDto = cartMapper.toDto(updatedCart);
             
-            logger.info("Item added to cart successfully: product={}, quantity={}", request.getProductId(), request.getQuantity());
+            logger.info("Item added to cart successfully: product={}, quantity={}, customLength={}", 
+                       request.getProductId(), request.getQuantity(), request.getCustomLength());
             return ResponseEntity.ok(cartDto);
             
         } catch (IllegalArgumentException e) {

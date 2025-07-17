@@ -1,8 +1,10 @@
 package com.ecommerce.application.dto;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 
 /**
  * Request DTO for adding items to cart
@@ -23,6 +25,10 @@ public class AddToCartRequest {
     private String deviceFingerprint;
     private Boolean isGift;
     private String giftMessage;
+    
+    // Optional field for variable dimension products
+    @DecimalMin(value = "0.0", inclusive = false, message = "Custom length must be greater than 0")
+    private BigDecimal customLength;
     
     // Default constructor
     public AddToCartRequest() {
@@ -89,6 +95,14 @@ public class AddToCartRequest {
     
     public void setGiftMessage(String giftMessage) {
         this.giftMessage = giftMessage;
+    }
+    
+    public BigDecimal getCustomLength() {
+        return customLength;
+    }
+    
+    public void setCustomLength(BigDecimal customLength) {
+        this.customLength = customLength;
     }
     
     @Override

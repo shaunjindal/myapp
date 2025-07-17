@@ -10,18 +10,23 @@ import { theme } from '../../../src/styles/theme';
 import { StyleSheet } from 'react-native';
 import { productService } from '../../../src/services/productService';
 import { recommendationService } from '../../../src/services/recommendationService';
-import { mapProductDtoToProduct } from '../../../src/types/api';
+import { cartService } from '../../../src/services/cartService';
+import { mapProductDtoToProduct, UpdateCartItemRequest } from '../../../src/types/api';
 import { Product } from '../../../src/types';
 import { RecommendationSection } from '../../../src/components/RecommendationSection';
+import { DimensionSelector } from '../../../src/components/DimensionSelector';
+import { DimensionVariantsManager } from '../../../src/components/DimensionVariantsManager';
 import { formatPrice } from '../../../src/utils/currencyUtils';
 
 const screenWidth = Dimensions.get('window').width;
+
+
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { getProductById, getRecommendedProducts } = useProductStore();
-  const { items, addItem, removeItem, updateQuantity } = useCartStore();
+  const { items, addItem, removeItem, updateQuantity, syncCart } = useCartStore();
   
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [indicatorsVisible, setIndicatorsVisible] = useState(true);
@@ -29,6 +34,10 @@ export default function ProductDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [customLength, setCustomLength] = useState<number | null>(null);
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [cartUpdateTrigger, setCartUpdateTrigger] = useState(0);
+
   const carouselRef = useRef<FlatList>(null);
   const indicatorOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<NodeJS.Timeout | null>(null);
@@ -125,9 +134,11 @@ export default function ProductDetailScreen() {
   }, [resetHideTimer]);
 
   // Computed values (not hooks)
-  const cartItem = items.find(item => item.product.id === product?.id);
-  const isInCart = !!cartItem;
-  const currentQuantity = cartItem?.quantity || 0;
+  // For variable dimension products, check if any variant is in cart
+  // For regular products, check if product is in cart
+  const cartItems = items.filter(item => item.product.id === product?.id);
+  const isInCart = cartItems.length > 0;
+  const currentQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   if (loading) {
     return (
@@ -147,24 +158,154 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const handleDimensionChange = (length: number | null, price: number | null) => {
+    setCustomLength(length);
+    setCalculatedPrice(price);
+  };
+
+
+
+  const handleAddSingleItem = async (length: number, quantity: number) => {
+    if (!product) return;
+    
+    try {
+      for (let i = 0; i < quantity; i++) {
+        await addItem(product, 1, length);
+      }
+      // Trigger cart update to refresh the dimension manager
+      handleCartUpdate();
+    } catch (error) {
+      console.error('Failed to add item to cart:', error);
+      throw error;
+    }
+  };
+
+  // Get existing cart items for this product with custom dimensions
+  const getExistingCartItems = () => {
+    if (!product) return [];
+    
+    const productCartItems = items.filter(item => 
+      item.product.id === product.id && item.customLength !== undefined
+    );
+    
+    // Group by length and sum quantities
+    const groupedItems = productCartItems.reduce((acc, item) => {
+      const length = item.customLength!;
+      const existing = acc.find(existing => existing.length === length);
+      
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        acc.push({
+          length: length,
+          quantity: item.quantity
+        });
+      }
+      
+      return acc;
+    }, [] as Array<{ length: number; quantity: number }>);
+    
+    return groupedItems;
+  };
+
+  const handleCartUpdate = () => {
+    setCartUpdateTrigger(prev => prev + 1);
+  };
+
+  const handleUpdateCartItem = async (length: number, newQuantity: number) => {
+    if (!product) return;
+    
+    try {
+      // Find the specific cart item with this product and custom length
+      const targetItem = items.find(item => 
+        item.product.id === product.id && 
+        item.customLength === length
+      );
+      
+      if (!targetItem) {
+        throw new Error('Cart item not found');
+      }
+      
+      if (newQuantity <= 0) {
+        // Remove the item completely using cart item ID
+        await cartService.removeCartItem(targetItem.id);
+      } else {
+        // Update the quantity using cart item ID
+        const updateRequest: UpdateCartItemRequest = {
+          quantity: newQuantity
+        };
+        await cartService.updateCartItem(targetItem.id, updateRequest);
+      }
+      
+      // Sync cart state with backend
+      await syncCart();
+      
+      // Trigger UI update
+      handleCartUpdate();
+      
+    } catch (error) {
+      console.error('Failed to update cart item:', error);
+      throw error;
+    }
+  };
+
+  const getUnitSymbol = (unit?: string): string => {
+    switch (unit) {
+      case 'FOOT': return 'ft';
+      case 'METER': return 'm';
+      case 'INCH': return 'in';
+      case 'YARD': return 'yd';
+      case 'CENTIMETER': return 'cm';
+      case 'MILLIMETER': return 'mm';
+      default: return 'unit';
+    }
+  };
+
   const handleAddToCart = () => {
-    addItem(product, 1);
+    // For variable dimension products, check if custom length is required
+    if (product.isVariableDimension && !customLength) {
+      Alert.alert('Dimension Required', 'Please select a length for this product.');
+      return;
+    }
+
+    addItem(product, 1, customLength || undefined);
     Alert.alert('Success', `Added ${product.name} to cart!`);
   };
 
   const handleIncrement = () => {
+    if (product?.isVariableDimension) {
+      // For variable dimension products, we can't simply increment
+      // User should use the dimension selector to add specific variants
+      Alert.alert('Use Dimension Selector', 'Please use the dimension selector to add specific sizes to your cart.');
+      return;
+    }
     updateQuantity(product.id, currentQuantity + 1);
   };
 
   const handleDecrement = () => {
+    if (product?.isVariableDimension) {
+      // For variable dimension products, we can't simply decrement
+      Alert.alert('Use Cart Screen', 'Please go to the cart screen to modify individual dimension variants.');
+      return;
+    }
     if (currentQuantity > 0) {
       updateQuantity(product.id, currentQuantity - 1);
     }
   };
 
-  const handleRemove = () => {
-    removeItem(product.id);
-    Alert.alert('Removed', `${product.name} removed from cart!`);
+  const handleRemove = async () => {
+    if (product?.isVariableDimension) {
+      // For variable dimension products, remove all variants
+      // We need to remove them one by one since each has the same product ID
+      // The backend will handle removing the specific cart item
+      for (const item of cartItems) {
+        await removeItem(item.product.id);
+      }
+      Alert.alert('Removed', `All ${product.name} variants removed from cart!`);
+    } else {
+      await removeItem(product.id);
+      Alert.alert('Removed', `${product.name} removed from cart!`);
+    }
   };
 
   const handleThumbnailPress = (index: number) => {
@@ -186,6 +327,55 @@ export default function ProductDetailScreen() {
   });
 
 
+
+  // Handle loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingStateContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary[600]} />
+          <Text style={styles.loadingStateText}>Loading product...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={48} color={theme.colors.error[600]} />
+          <Text style={styles.errorText}>{error}</Text>
+          <Button
+            title="Try Again"
+            onPress={() => {
+              setError(null);
+              setLoading(true);
+            }}
+            style={styles.retryButtonStyle}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Handle missing product
+  if (!product) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="cube-outline" size={48} color={theme.colors.text.secondary} />
+          <Text style={styles.errorText}>Product not found</Text>
+          <Button
+            title="Go Back"
+            onPress={() => router.back()}
+            style={styles.retryButtonStyle}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -282,8 +472,27 @@ export default function ProductDetailScreen() {
             <View style={styles.priceSection}>
               <View style={styles.priceContainer}>
                 <View style={styles.currentPriceRow}>
-                  <Text style={styles.price}>{formatPrice(product.price)}</Text>
-                  {product.originalPrice && (product.originalPrice - product.price) > 0 && (
+                  {product.isVariableDimension ? (
+                    calculatedPrice ? (
+                      <Text style={styles.price}>
+                        {formatPrice(calculatedPrice)}
+                      </Text>
+                    ) : (
+                      <View style={styles.variablePriceDisplay}>
+                        <Text style={styles.price}>
+                          {formatPrice(product.variableDimensionRate || 0)}
+                        </Text>
+                        <Text style={styles.priceUnit}>
+                          per sq {getUnitSymbol(product.dimensionUnit)}
+                        </Text>
+                      </View>
+                    )
+                  ) : (
+                    <Text style={styles.price}>
+                      {formatPrice(product.price)}
+                    </Text>
+                  )}
+                  {product.originalPrice && (product.originalPrice - product.price) > 0 && !product.isVariableDimension && (
                     <View style={styles.discountBadge}>
                       <Text style={styles.discountText}>
                         -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
@@ -291,17 +500,50 @@ export default function ProductDetailScreen() {
                     </View>
                   )}
                 </View>
-                {product.originalPrice && (product.originalPrice - product.price) > 0 && (
-                  <View style={styles.originalPriceRow}>
-                    <Text style={styles.originalPrice}>Was {formatPrice(product.originalPrice)}</Text>
-                    <Text style={styles.savings}>
-                      You save {formatPrice(product.originalPrice - product.price)}
-                    </Text>
-                  </View>
+                {product.isVariableDimension ? (
+                  calculatedPrice ? (
+                    <View style={styles.originalPriceRow}>
+                      <Text style={styles.originalPrice}>
+                        Rate: {formatPrice(product.variableDimensionRate || 0)} per sq {getUnitSymbol(product.dimensionUnit)}
+                      </Text>
+                      <Text style={styles.savings}>
+                        {product.fixedHeight} × {customLength} = {((product.fixedHeight || 0) * (customLength || 0)).toFixed(2)} sq {getUnitSymbol(product.dimensionUnit)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.originalPriceRow}>
+                      <Text style={styles.originalPrice}>
+                        Fixed Height: {product.fixedHeight} {getUnitSymbol(product.dimensionUnit)}
+                      </Text>
+                      <Text style={styles.savings}>
+                        Select length to calculate total
+                      </Text>
+                    </View>
+                  )
+                ) : (
+                  product.originalPrice && (product.originalPrice - product.price) > 0 && (
+                    <View style={styles.originalPriceRow}>
+                      <Text style={styles.originalPrice}>Was {formatPrice(product.originalPrice)}</Text>
+                      <Text style={styles.savings}>
+                        You save {formatPrice(product.originalPrice - product.price)}
+                      </Text>
+                    </View>
+                  )
                 )}
               </View>
             </View>
           </View>
+
+          {/* Dimension Variants Manager for Variable Dimension Products */}
+          {product.isVariableDimension && (
+                          <DimensionVariantsManager
+                key={`dimension-manager-${cartUpdateTrigger}`}
+                product={product}
+                onAddSingleItem={handleAddSingleItem}
+                existingCartItems={getExistingCartItems()}
+                onUpdateCartItem={handleUpdateCartItem}
+              />
+          )}
 
           {/* Availability Section */}
           <View style={styles.availabilitySection}>
@@ -421,8 +663,8 @@ export default function ProductDetailScreen() {
         />
       </ScrollView>
 
-      {/* Add to Cart Section */}
-      {product.inStock && (
+      {/* Add to Cart Section for Regular Products */}
+      {product.inStock && !product.isVariableDimension && (
         <View style={styles.cartSection}>
           {!isInCart ? (
             <TouchableOpacity
@@ -430,8 +672,14 @@ export default function ProductDetailScreen() {
               onPress={handleAddToCart}
               activeOpacity={0.8}
             >
-              <Ionicons name="cart-outline" size={20} color={theme.colors.background} />
-              <Text style={styles.addToCartText}>Add to Cart</Text>
+              <Ionicons 
+                name="cart-outline" 
+                size={20} 
+                color={theme.colors.background} 
+              />
+              <Text style={styles.addToCartText}>
+                Add to Cart
+              </Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.cartControls}>
@@ -459,6 +707,34 @@ export default function ProductDetailScreen() {
               </TouchableOpacity>
             </View>
           )}
+        </View>
+      )}
+
+      {/* Cart Summary for Variable Dimension Products */}
+      {product.inStock && product.isVariableDimension && isInCart && (
+        <View style={styles.cartSection}>
+          <View style={styles.cartSummary}>
+            <View style={styles.cartSummaryHeader}>
+              <Ionicons name="cart" size={20} color={theme.colors.primary[600]} />
+              <Text style={styles.cartSummaryTitle}>In Your Cart</Text>
+            </View>
+            <Text style={styles.cartSummaryText}>
+              {cartItems.length} dimension variant{cartItems.length > 1 ? 's' : ''} • Total quantity: {currentQuantity}
+            </Text>
+            <View style={styles.cartSummaryActions}>
+              <TouchableOpacity 
+                style={styles.viewCartButton}
+                onPress={() => router.push('/(tabs)/cart')}
+              >
+                <Ionicons name="eye-outline" size={16} color={theme.colors.primary[600]} />
+                <Text style={styles.viewCartText}>View Cart</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.removeAllButton} onPress={handleRemove}>
+                <Ionicons name="trash" size={16} color={theme.colors.error[600]} />
+                <Text style={styles.removeAllText}>Remove All</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -713,6 +989,17 @@ const styles = StyleSheet.create({
     fontWeight: '800' as any,
     color: theme.colors.text.primary,
     marginRight: theme.spacing.md,
+  },
+  variablePriceDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginRight: theme.spacing.md,
+  },
+  priceUnit: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '600' as any,
+    color: theme.colors.text.secondary,
+    marginLeft: theme.spacing.sm,
   },
   discountBadge: {
     backgroundColor: theme.colors.error[600],
@@ -1017,6 +1304,13 @@ const styles = StyleSheet.create({
     fontWeight: '600' as any,
     marginLeft: theme.spacing.sm,
   },
+  addToCartButtonDisabled: {
+    backgroundColor: theme.colors.gray[300],
+    shadowOpacity: 0,
+  },
+  addToCartTextDisabled: {
+    color: theme.colors.gray[500],
+  },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1090,5 +1384,79 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.base,
     color: theme.colors.text.secondary,
     fontStyle: 'italic',
+  },
+  cartSummary: {
+    backgroundColor: theme.colors.primary[50],
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[200],
+  },
+  cartSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  cartSummaryTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginLeft: theme.spacing.sm,
+  },
+  cartSummaryText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.md,
+  },
+  cartSummaryActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewCartButton: {
+    backgroundColor: theme.colors.primary[600],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  viewCartText: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '600',
+    color: theme.colors.text.inverse,
+  },
+  removeAllButton: {
+    backgroundColor: theme.colors.error[50],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.error[200],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  removeAllText: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '600',
+    color: theme.colors.error[600],
+  },
+  loadingStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  loadingStateText: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+  },
+  retryButtonStyle: {
+    marginTop: theme.spacing.lg,
+    minWidth: 120,
   },
 }); 

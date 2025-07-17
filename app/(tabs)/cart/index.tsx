@@ -216,8 +216,19 @@ export default function CartScreen() {
                     </View>
                     
                     <View style={styles.itemPriceContainer}>
-                      <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
-                      <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
+                      {item.product.isVariableDimension && item.calculatedUnitPrice ? (
+                        <>
+                          <Text style={styles.unitPrice}>
+                            Custom: {item.customLength} × {item.product.fixedHeight} = {((item.customLength || 0) * (item.product.fixedHeight || 0)).toFixed(2)} sq units
+                          </Text>
+                          <Text style={styles.itemTotal}>{formatPrice(item.calculatedUnitPrice)}</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
+                          <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
+                        </>
+                      )}
                     </View>
                   </View>
                 </View>

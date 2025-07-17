@@ -81,6 +81,12 @@ export interface ProductDto {
   rating: number;
   reviewCount: number;
   brand: string;
+  // Variable dimension fields
+  isVariableDimension?: boolean;
+  fixedHeight?: number;
+  variableDimensionRate?: number;
+  maxLength?: number;
+  dimensionUnit?: 'MILLIMETER' | 'CENTIMETER' | 'METER' | 'INCH' | 'FOOT' | 'YARD';
   createdAt: string;
   updatedAt: string;
 }
@@ -152,20 +158,37 @@ export interface CartDto {
 export interface CartItemDto {
   id: string;
   productId: string;
-  product: ProductDto;
+  productName: string;
+  productImageUrl?: string;
+  productSku?: string;
+  productBrand?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  originalPrice?: number;
+  discountAmount?: number;
+  savingsAmount?: number;
   // Price component fields from product
   baseAmount?: number;
   taxRate?: number;
   taxAmount?: number;
+  isGift?: boolean;
+  giftMessage?: string;
+  isAvailable?: boolean;
+  isPriceChanged?: boolean;
+  unavailabilityReason?: string;
+  // Variable dimension fields
+  customLength?: number;
+  calculatedUnitPrice?: number;
+  dimensionDetails?: string;
   addedAt: string;
+  updatedAt?: string;
 }
 
 export interface AddToCartRequest {
   productId: string;
   quantity: number;
+  customLength?: number; // For variable dimension products
 }
 
 export interface UpdateCartItemRequest {
@@ -298,6 +321,12 @@ export const mapProductDtoToProduct = (productDto: any) => ({
   brand: productDto.brand || 'Unknown',
   specifications: productDto.specifications || {},
   tags: productDto.tags || [],
+  // Variable dimension fields
+  isVariableDimension: productDto.isVariableDimension || false,
+  fixedHeight: productDto.fixedHeight,
+  variableDimensionRate: productDto.variableDimensionRate,
+  maxLength: productDto.maxLength,
+  dimensionUnit: productDto.dimensionUnit,
 });
 
 export const mapCategoryDtoToCategory = (categoryDto: any) => ({

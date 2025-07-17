@@ -1,6 +1,7 @@
 package com.ecommerce.infrastructure.persistence.entity;
 
 import com.ecommerce.domain.product.ProductStatus;
+import com.ecommerce.domain.product.DimensionUnit;
 import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -148,6 +149,26 @@ public class ProductJpaEntity extends BaseJpaEntity {
     @Column(name = "meta_keywords", length = 500)
     private String metaKeywords;
 
+    // Variable dimension pricing fields
+    @Column(name = "is_variable_dimension", nullable = false)
+    private boolean isVariableDimension = false;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Fixed height must be greater than 0")
+    @Column(name = "fixed_height", precision = 10, scale = 3)
+    private BigDecimal fixedHeight;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Variable dimension rate must be greater than 0")
+    @Column(name = "variable_dimension_rate", precision = 12, scale = 2)
+    private BigDecimal variableDimensionRate;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Max length must be greater than 0")
+    @Column(name = "max_length", precision = 10, scale = 3)
+    private BigDecimal maxLength;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dimension_unit", length = 20)
+    private DimensionUnit dimensionUnit;
+
     // Default constructor
     public ProductJpaEntity() {
         super();
@@ -283,6 +304,52 @@ public class ProductJpaEntity extends BaseJpaEntity {
 
     public BigDecimal getFinalPrice() {
         return baseAmount != null && taxAmount != null ? baseAmount.add(taxAmount) : price;
+    }
+
+    // Variable dimension business methods
+    public BigDecimal calculatePriceForLength(BigDecimal customLength) {
+        if (!isVariableDimension || fixedHeight == null || variableDimensionRate == null || customLength == null) {
+            return price; // Return regular price if not variable dimension
+        }
+        
+        if (customLength.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Custom length must be greater than 0");
+        }
+        
+        if (maxLength != null && customLength.compareTo(maxLength) > 0) {
+            throw new IllegalArgumentException("Custom length cannot exceed maximum length of " + maxLength + " " + dimensionUnit.getSymbol());
+        }
+        
+        // Calculate area: fixedHeight × customLength
+        BigDecimal area = fixedHeight.multiply(customLength);
+        
+        // Calculate final price: area × rate (rate already includes tax)
+        BigDecimal finalPrice = area.multiply(variableDimensionRate);
+        
+        return finalPrice;
+    }
+    
+    public boolean isValidCustomLength(BigDecimal customLength) {
+        if (!isVariableDimension || customLength == null) {
+            return false;
+        }
+        
+        return customLength.compareTo(BigDecimal.ZERO) > 0 && 
+               (maxLength == null || customLength.compareTo(maxLength) <= 0);
+    }
+    
+    public String getFormattedDimensionInfo() {
+        if (!isVariableDimension || fixedHeight == null || dimensionUnit == null) {
+            return "";
+        }
+        
+        return String.format("Fixed Height: %.2f %s, Max Length: %.2f %s, Rate: %.2f per sq %s", 
+            fixedHeight.doubleValue(), 
+            dimensionUnit.getSymbol(),
+            maxLength != null ? maxLength.doubleValue() : 0.0,
+            dimensionUnit.getSymbol(),
+            variableDimensionRate != null ? variableDimensionRate.doubleValue() : 0.0,
+            dimensionUnit.getSymbol());
     }
 
     // Getters and Setters
@@ -631,6 +698,49 @@ public class ProductJpaEntity extends BaseJpaEntity {
 
     public void setMetaKeywords(String metaKeywords) {
         this.metaKeywords = metaKeywords;
+    }
+
+    // Variable dimension getters and setters
+    @JsonProperty("isVariableDimension")
+    public boolean isVariableDimension() {
+        return isVariableDimension;
+    }
+
+    @JsonProperty("isVariableDimension")
+    public void setVariableDimension(boolean variableDimension) {
+        this.isVariableDimension = variableDimension;
+    }
+
+    public BigDecimal getFixedHeight() {
+        return fixedHeight;
+    }
+
+    public void setFixedHeight(BigDecimal fixedHeight) {
+        this.fixedHeight = fixedHeight;
+    }
+
+    public BigDecimal getVariableDimensionRate() {
+        return variableDimensionRate;
+    }
+
+    public void setVariableDimensionRate(BigDecimal variableDimensionRate) {
+        this.variableDimensionRate = variableDimensionRate;
+    }
+
+    public BigDecimal getMaxLength() {
+        return maxLength;
+    }
+
+    public void setMaxLength(BigDecimal maxLength) {
+        this.maxLength = maxLength;
+    }
+
+    public DimensionUnit getDimensionUnit() {
+        return dimensionUnit;
+    }
+
+    public void setDimensionUnit(DimensionUnit dimensionUnit) {
+        this.dimensionUnit = dimensionUnit;
     }
 
     /**

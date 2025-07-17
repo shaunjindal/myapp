@@ -123,13 +123,20 @@ public class OrderService {
             }
 
             OrderItemJpaEntity orderItem = new OrderItemJpaEntity(order, product, 
-                cartItem.getQuantity(), cartItem.getUnitPrice());
+                cartItem.getQuantity(), cartItem.getEffectiveUnitPrice());
             
             // Set additional properties
             orderItem.setDiscountAmount(cartItem.getDiscountAmount());
             orderItem.setGift(cartItem.getIsGift() != null ? cartItem.getIsGift() : false);
             orderItem.setGiftMessage(cartItem.getGiftMessage());
             orderItem.setCustomAttributes(cartItem.getCustomAttributes());
+            
+            // Handle variable dimension pricing
+            if (cartItem.hasCustomDimensions()) {
+                orderItem.setCustomLength(cartItem.getCustomLength());
+                orderItem.setCalculatedUnitPrice(cartItem.getCalculatedUnitPrice());
+                orderItem.setDimensionDetails(cartItem.getDimensionDetails());
+            }
             
             // Set price component fields from product
             orderItem.setBaseAmount(product.getBaseAmount());
@@ -138,9 +145,9 @@ public class OrderService {
 
             order.addItem(orderItem);
             
-            // Calculate subtotal from base amounts (excluding tax)
-            BigDecimal itemBaseTotal = orderItem.getBaseAmount().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
-            subtotal = subtotal.add(itemBaseTotal);
+            // Calculate subtotal from effective unit price (for both regular and variable dimension products)
+            BigDecimal itemTotal = orderItem.getEffectiveUnitPrice().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+            subtotal = subtotal.add(itemTotal);
             totalWeight = totalWeight.add(orderItem.getTotalWeight());
 
             // Reserve product stock

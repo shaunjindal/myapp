@@ -125,6 +125,11 @@ public class CartMapper {
             }
         }
         
+        // Map variable dimension fields
+        dto.setCustomLength(entity.getCustomLength());
+        dto.setCalculatedUnitPrice(entity.getCalculatedUnitPrice());
+        dto.setDimensionDetails(entity.getDimensionDetails());
+        
         return dto;
     }
     

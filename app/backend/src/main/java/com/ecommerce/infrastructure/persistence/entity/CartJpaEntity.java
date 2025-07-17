@@ -115,9 +115,14 @@ public class CartJpaEntity extends BaseJpaEntity {
     }
     
     public BigDecimal getSubtotal() {
-        // Calculate subtotal from base amounts (excluding tax)
+        // Calculate subtotal - for variable dimension products, calculatedUnitPrice already includes tax
         return items.stream()
                 .map(item -> {
+                    // For variable dimension products, calculatedUnitPrice is already the total price (including tax)
+                    if (item.hasCustomDimensions() && item.getCalculatedUnitPrice() != null) {
+                        return item.getCalculatedUnitPrice();
+                    }
+                    
                     ProductJpaEntity product = item.getProduct();
                     BigDecimal baseAmount = product.getBaseAmount() != null ? 
                         product.getBaseAmount() : item.getUnitPrice();

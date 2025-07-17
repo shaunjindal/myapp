@@ -134,7 +134,11 @@ public class CartService {
      * Add item to cart
      */
     public CartJpaEntity addItemToCart(String cartId, String productId, int quantity) {
-        logger.debug("Adding item to cart: {} product: {} quantity: {}", cartId, productId, quantity);
+        return addItemToCart(cartId, productId, quantity, null);
+    }
+    
+    public CartJpaEntity addItemToCart(String cartId, String productId, int quantity, BigDecimal customLength) {
+        logger.debug("Adding item to cart: {} product: {} quantity: {} customLength: {}", cartId, productId, quantity, customLength);
         
         CartJpaEntity cart = cartRepository.findById(cartId)
                 .orElseThrow(() -> new IllegalArgumentException("Cart not found: " + cartId));
@@ -146,8 +150,25 @@ public class CartService {
         ProductJpaEntity product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
         
-        // Check if item already exists in cart
-        Optional<CartItemJpaEntity> existingItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        // Validate custom length for variable dimension products
+        if (product.isVariableDimension()) {
+            if (customLength == null) {
+                throw new IllegalArgumentException("Custom length is required for variable dimension products");
+            }
+            if (!product.isValidCustomLength(customLength)) {
+                throw new IllegalArgumentException("Invalid custom length: " + customLength + ". Max allowed: " + product.getMaxLength());
+            }
+        }
+        
+        // Check if item with same specifications already exists
+        Optional<CartItemJpaEntity> existingItem = Optional.empty();
+        if (product.isVariableDimension() && customLength != null) {
+            // For variable dimension products, find existing item with same product and custom length
+            existingItem = cartItemRepository.findByCartIdAndProductIdAndCustomLength(cartId, productId, customLength);
+        } else {
+            // For regular products, find any existing item with the same product (no custom length)
+            existingItem = cartItemRepository.findByCartIdAndProductIdWithNullCustomLength(cartId, productId);
+        }
         
         if (existingItem.isPresent()) {
             // Update existing item quantity
@@ -157,6 +178,12 @@ public class CartService {
         } else {
             // Create new cart item
             CartItemJpaEntity newItem = new CartItemJpaEntity(cart, product, quantity, product.getPrice());
+            
+            // Handle variable dimension pricing
+            if (product.isVariableDimension() && customLength != null) {
+                newItem.updateVariableDimensionPricing(customLength);
+            }
+            
             cart.addItem(newItem);
             cartItemRepository.save(newItem);
         }

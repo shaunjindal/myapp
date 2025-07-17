@@ -35,6 +35,17 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
   // Calculate subtotal from base amounts (excluding tax) to match backend
   const subtotal = items.reduce((sum, item) => {
     const product = item.product as any;
+    
+    // For variable dimension products, calculatedUnitPrice is already the total price including tax
+    if (item.calculatedUnitPrice && product.isVariableDimension) {
+      return sum + item.calculatedUnitPrice;
+    }
+    
+    // For variable dimension products without calculatedUnitPrice (fallback)
+    if (item.calculatedUnitPrice && !product.isVariableDimension) {
+      return sum + (item.calculatedUnitPrice * item.quantity);
+    }
+    
     let baseAmount = product.baseAmount;
     
     // If baseAmount is not available, calculate it from price and taxRate
@@ -64,6 +75,11 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
   let shippingDescription = 'Shipping cost';
   let discountDescription = 'Discount applied';
   
+  // Check if we have any variable dimension products with tax included
+  const hasVariableDimensionItems = items.some(item => 
+    item.calculatedUnitPrice && item.product.isVariableDimension
+  );
+  
   // Process each component
   paymentComponents.forEach((component: any) => {
     const amount = component.amount || 0;
@@ -71,9 +87,14 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
     
     switch (component.type) {
       case 'TAX':
+        // For variable dimension products, tax might already be included
         tax = amount;
         taxLabel = component.text || 'Tax';
-        taxDescription = `Tax component: ${component.text}`;
+        if (hasVariableDimensionItems && amount === 0) {
+          taxDescription = 'Tax included in pricing';
+        } else {
+          taxDescription = `Tax component: ${component.text}`;
+        }
         break;
       case 'SHIPPING':
         shipping = amount;
@@ -152,6 +173,10 @@ const convertApiCartToFrontend = (apiCart: any) => {
       taxAmount: item.taxAmount,
     },
     quantity: item.quantity || 0,
+    // Variable dimension fields from backend
+    customLength: item.customLength,
+    calculatedUnitPrice: item.calculatedUnitPrice,
+    dimensionDetails: item.dimensionDetails,
   }));
   
   const totals = calculateTotals(items, apiCart);
@@ -202,10 +227,16 @@ export interface CartStoreState extends CartState {
   handleUserLogout: () => Promise<void>;
   
   // Enhanced cart methods with session awareness
-  addItemWithSession: (product: Product, quantity?: number) => Promise<void>;
+  addItemWithSession: (product: Product, quantity?: number, customLength?: number) => Promise<void>;
   updateQuantityWithSession: (productId: string, quantity: number) => Promise<void>;
   removeItemWithSession: (productId: string) => Promise<void>;
   clearCartWithSession: () => Promise<void>;
+  
+  // Legacy methods for backward compatibility
+  addItem: (product: Product, quantity?: number, customLength?: number) => Promise<void>;
+  removeItem: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
 }
 
 export const useCartStore = create<CartStoreState>()(
@@ -410,9 +441,9 @@ export const useCartStore = create<CartStoreState>()(
       },
       
       // Enhanced add item with session awareness
-      addItemWithSession: async (product: Product, quantity: number = 1) => {
+      addItemWithSession: async (product: Product, quantity: number = 1, customLength?: number) => {
         try {
-          const apiCart = await cartService.quickAddToCart(product.id, quantity);
+          const apiCart = await cartService.quickAddToCart(product.id, quantity, customLength);
           const { items, total, subtotal, tax, shipping, finalTotal } = convertApiCartToFrontend(apiCart);
           
           set({ items, total, subtotal, tax, shipping, finalTotal, lastSyncAt: new Date() });
@@ -421,18 +452,32 @@ export const useCartStore = create<CartStoreState>()(
           console.error('Failed to add item to cart:', error);
           // Fallback to local state for offline support
           const { items } = get();
-          const existingItem = items.find(item => item.product.id === product.id);
+          const existingItem = items.find(item => 
+            item.product.id === product.id && 
+            // For variable dimension products, also check custom length
+            (!product.isVariableDimension || item.customLength === customLength)
+          );
           
           if (existingItem) {
             const updatedItems = items.map(item =>
-              item.product.id === product.id
+              item.product.id === product.id && 
+              (!product.isVariableDimension || item.customLength === customLength)
                 ? { ...item, quantity: item.quantity + quantity }
                 : item
             );
             const totals = calculateTotals(updatedItems);
             set({ items: updatedItems, ...totals });
           } else {
-            const newItem = { id: product.id, product, quantity };
+            const newItem = { 
+              id: product.id, 
+              product, 
+              quantity,
+              customLength: customLength || undefined,
+              calculatedUnitPrice: customLength && product.isVariableDimension ? 
+                product.fixedHeight && product.variableDimensionRate ? 
+                  (product.fixedHeight * customLength * product.variableDimensionRate) : undefined 
+                : undefined
+            };
             const updatedItems = [...items, newItem];
             const totals = calculateTotals(updatedItems);
             set({ items: updatedItems, ...totals });
@@ -520,8 +565,8 @@ export const useCartStore = create<CartStoreState>()(
       },
       
       // Legacy methods for backward compatibility
-      addItem: async (product: Product, quantity: number = 1) => {
-        await get().addItemWithSession(product, quantity);
+      addItem: async (product: Product, quantity: number = 1, customLength?: number) => {
+        await get().addItemWithSession(product, quantity, customLength);
       },
       
       removeItem: async (productId: string) => {

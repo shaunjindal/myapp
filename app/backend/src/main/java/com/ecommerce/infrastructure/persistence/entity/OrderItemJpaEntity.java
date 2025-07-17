@@ -89,6 +89,16 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
     @Column(name = "custom_attributes", length = 1000)
     private String customAttributes;
 
+    // Variable dimension fields
+    @Column(name = "custom_length", precision = 10, scale = 3)
+    private BigDecimal customLength;
+    
+    @Column(name = "calculated_unit_price", precision = 19, scale = 2)
+    private BigDecimal calculatedUnitPrice;
+    
+    @Column(name = "dimension_details", columnDefinition = "JSON")
+    private String dimensionDetails;
+
     // Constructors
     public OrderItemJpaEntity() {
         super();
@@ -141,6 +151,37 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
     public BigDecimal getTotalWeight() {
         return productWeight != null ? 
             productWeight.multiply(BigDecimal.valueOf(quantity)) : BigDecimal.ZERO;
+    }
+    
+    // Variable dimension methods
+    public BigDecimal getEffectiveUnitPrice() {
+        return calculatedUnitPrice != null ? calculatedUnitPrice : unitPrice;
+    }
+    
+    public boolean hasCustomDimensions() {
+        return customLength != null && calculatedUnitPrice != null;
+    }
+    
+    public String getFormattedDimensionInfo() {
+        if (!hasCustomDimensions()) {
+            return "";
+        }
+        
+        // Extract unit from dimension details JSON if available
+        String unit = "units";
+        if (dimensionDetails != null && dimensionDetails.contains("\"unit\"")) {
+            try {
+                int unitStart = dimensionDetails.indexOf("\"unit\": \"") + 9;
+                int unitEnd = dimensionDetails.indexOf("\"", unitStart);
+                if (unitEnd > unitStart) {
+                    unit = dimensionDetails.substring(unitStart, unitEnd);
+                }
+            } catch (Exception e) {
+                // Fallback to default unit
+            }
+        }
+        
+        return String.format("Length: %.2f %s", customLength.doubleValue(), unit);
     }
 
     // Getters and Setters
@@ -288,6 +329,31 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
 
     public void setCustomAttributes(String customAttributes) {
         this.customAttributes = customAttributes;
+    }
+    
+    // Variable dimension getters and setters
+    public BigDecimal getCustomLength() {
+        return customLength;
+    }
+    
+    public void setCustomLength(BigDecimal customLength) {
+        this.customLength = customLength;
+    }
+    
+    public BigDecimal getCalculatedUnitPrice() {
+        return calculatedUnitPrice;
+    }
+    
+    public void setCalculatedUnitPrice(BigDecimal calculatedUnitPrice) {
+        this.calculatedUnitPrice = calculatedUnitPrice;
+    }
+    
+    public String getDimensionDetails() {
+        return dimensionDetails;
+    }
+    
+    public void setDimensionDetails(String dimensionDetails) {
+        this.dimensionDetails = dimensionDetails;
     }
 
     public BigDecimal getBaseAmount() {

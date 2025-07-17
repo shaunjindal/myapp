@@ -18,12 +18,22 @@ export interface Product {
   brand: string;
   specifications: { [key: string]: string };
   tags: string[];
+  // Variable dimension fields
+  isVariableDimension?: boolean;
+  fixedHeight?: number;
+  variableDimensionRate?: number;
+  maxLength?: number;
+  dimensionUnit?: 'MILLIMETER' | 'CENTIMETER' | 'METER' | 'INCH' | 'FOOT' | 'YARD';
 }
 
 export interface CartItem {
   id: string;
   product: Product;
   quantity: number;
+  // Variable dimension fields
+  customLength?: number;
+  calculatedUnitPrice?: number;
+  dimensionDetails?: string;
 }
 
 export interface User {

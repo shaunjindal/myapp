@@ -36,6 +36,11 @@ public class CartItemDto {
     private Boolean isPriceChanged;
     private String unavailabilityReason;
     
+    // Variable dimension fields
+    private BigDecimal customLength;
+    private BigDecimal calculatedUnitPrice;
+    private String dimensionDetails;
+    
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime addedAt;
     
@@ -71,6 +76,12 @@ public class CartItemDto {
     }
     
     public BigDecimal getEffectiveUnitPrice() {
+        // For variable dimension products, use calculated unit price if available
+        if (calculatedUnitPrice != null) {
+            return calculatedUnitPrice;
+        }
+        
+        // Otherwise, calculate from total price and quantity
         if (quantity != null && quantity > 0 && totalPrice != null) {
             return totalPrice.divide(BigDecimal.valueOf(quantity), 2, BigDecimal.ROUND_HALF_UP);
         }
@@ -252,6 +263,36 @@ public class CartItemDto {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    // Variable dimension getters and setters
+    public BigDecimal getCustomLength() {
+        return customLength;
+    }
+    
+    public void setCustomLength(BigDecimal customLength) {
+        this.customLength = customLength;
+    }
+    
+    public BigDecimal getCalculatedUnitPrice() {
+        return calculatedUnitPrice;
+    }
+    
+    public void setCalculatedUnitPrice(BigDecimal calculatedUnitPrice) {
+        this.calculatedUnitPrice = calculatedUnitPrice;
+    }
+    
+    public String getDimensionDetails() {
+        return dimensionDetails;
+    }
+    
+    public void setDimensionDetails(String dimensionDetails) {
+        this.dimensionDetails = dimensionDetails;
+    }
+    
+    // Helper methods for variable dimensions
+    public boolean hasCustomDimensions() {
+        return customLength != null && calculatedUnitPrice != null;
     }
     
     @Override

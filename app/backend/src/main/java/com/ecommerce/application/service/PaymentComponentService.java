@@ -57,6 +57,17 @@ public class PaymentComponentService {
         // Calculate tax for each cart item using product's tax rate
         for (var cartItem : cart.getItems()) {
             var product = cartItem.getProduct();
+            
+            // For variable dimension products, tax is already included in calculatedUnitPrice
+            if (cartItem.hasCustomDimensions() && cartItem.getCalculatedUnitPrice() != null) {
+                // For variable dimension products, the rate already includes tax
+                // So we don't add separate tax - just include the subtotal
+                totalSubtotal = totalSubtotal.add(cartItem.getCalculatedUnitPrice());
+                // No additional tax amount since it's already included
+                continue;
+            }
+            
+            // For regular products, calculate tax separately
             BigDecimal itemSubtotal = product.getBaseAmount() != null ? 
                 product.getBaseAmount().multiply(BigDecimal.valueOf(cartItem.getQuantity())) :
                 cartItem.getUnitPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
@@ -74,7 +85,8 @@ public class PaymentComponentService {
             totalTaxAmount.divide(totalSubtotal, 4, BigDecimal.ROUND_HALF_UP) : BigDecimal.ZERO;
         
         String taxLabel = determineTaxLabel(address, effectiveTaxRate);
-        String taxDescription = "Tax calculated per product rates";
+        String taxDescription = totalTaxAmount.compareTo(BigDecimal.ZERO) > 0 ? 
+            "Tax calculated per product rates" : "Tax included in pricing";
         
         logger.debug("Product-level tax calculation result: amount={}, effective rate={}, label={}", 
                     totalTaxAmount, effectiveTaxRate, taxLabel);

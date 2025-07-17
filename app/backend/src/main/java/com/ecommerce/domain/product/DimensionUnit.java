@@ -32,7 +32,12 @@ public enum DimensionUnit {
     /**
      * Feet
      */
-    FOOT("ft", "Foot", BigDecimal.valueOf(0.3048));
+    FOOT("ft", "Foot", BigDecimal.valueOf(0.3048)),
+    
+    /**
+     * Yards
+     */
+    YARD("yd", "Yard", BigDecimal.valueOf(0.9144));
     
     private final String symbol;
     private final String displayName;

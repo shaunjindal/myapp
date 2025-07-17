@@ -17,8 +17,30 @@ export const CartItem: React.FC<CartItemProps> = ({
   onRemove,
 }) => {
   const { product, quantity } = item;
-  const total = product.price * quantity;
-  const isDiscounted = product.originalPrice && product.originalPrice > product.price;
+  
+  // For variable dimension products, calculatedUnitPrice is the total price
+  const effectivePrice = item.calculatedUnitPrice && product.isVariableDimension ? 
+    item.calculatedUnitPrice : 
+    (item.calculatedUnitPrice || product.price);
+    
+  const total = item.calculatedUnitPrice && product.isVariableDimension ? 
+    item.calculatedUnitPrice :  // Don't multiply by quantity for variable dimensions
+    effectivePrice * quantity;
+    
+  const isDiscounted = product.originalPrice && product.originalPrice > product.price && !item.calculatedUnitPrice;
+
+  // Helper function to get unit symbol
+  const getUnitSymbol = () => {
+    switch (product.dimensionUnit) {
+      case 'MILLIMETER': return 'mm';
+      case 'CENTIMETER': return 'cm'; 
+      case 'METER': return 'm';
+      case 'INCH': return 'in';
+      case 'FOOT': return 'ft';
+      case 'YARD': return 'yd';
+      default: return 'units';
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -49,52 +71,102 @@ export const CartItem: React.FC<CartItemProps> = ({
         </View>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>{formatPrice(product.price)}</Text>
-          {isDiscounted && product.originalPrice && (
+          {product.isVariableDimension && item.calculatedUnitPrice ? (
+            <View style={styles.variablePriceDisplay}>
+              <Text style={styles.price}>{formatPrice(item.calculatedUnitPrice)}</Text>
+              <Text style={styles.priceNote}>Total for custom size</Text>
+            </View>
+          ) : (
+            <Text style={styles.price}>
+              {item.calculatedUnitPrice ? formatPrice(item.calculatedUnitPrice) : formatPrice(product.price)}
+            </Text>
+          )}
+          {isDiscounted && product.originalPrice && !item.calculatedUnitPrice && (
             <Text style={styles.originalPrice}>{formatPrice(product.originalPrice)}</Text>
+          )}
+          {product.isVariableDimension && product.variableDimensionRate && (
+            <Text style={styles.rateInfo}>
+              Rate: {formatPrice(product.variableDimensionRate)}/sq {getUnitSymbol()}
+            </Text>
           )}
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.quantityContainer}>
-            <TouchableOpacity
-              style={[
-                styles.quantityButton,
-                quantity <= 0 && styles.quantityButtonDisabled,
-              ]}
-              onPress={() => onUpdateQuantity(product.id, quantity - 1)}
-              disabled={quantity <= 0}
-            >
-              <Ionicons
-                name="remove"
-                size={16}
-                color={quantity <= 0 ? theme.colors.gray[400] : theme.colors.gray[700]}
-              />
-            </TouchableOpacity>
-            
-            <View style={styles.quantityDisplay}>
-              <Text style={styles.quantity}>{quantity}</Text>
+        {/* Enhanced Custom Dimensions Info */}
+        {item.customLength && product.isVariableDimension && (
+          <View style={styles.dimensionsContainer}>
+            <View style={styles.dimensionsBadge}>
+              <Ionicons name="resize-outline" size={12} color={theme.colors.primary[600]} />
+              <Text style={styles.dimensionsText}>Custom Dimensions</Text>
             </View>
             
-            <TouchableOpacity
-              style={[
-                styles.quantityButton,
-                quantity >= product.stockQuantity && styles.quantityButtonDisabled,
-              ]}
-              onPress={() => onUpdateQuantity(product.id, quantity + 1)}
-              disabled={quantity >= product.stockQuantity}
-            >
-              <Ionicons
-                name="add"
-                size={16}
-                color={quantity >= product.stockQuantity ? theme.colors.gray[400] : theme.colors.gray[700]}
-              />
-            </TouchableOpacity>
+            <View style={styles.dimensionsDetails}>
+              <Text style={styles.dimensionsSubtext}>
+                Length: {item.customLength} {getUnitSymbol()}
+              </Text>
+              {product.fixedHeight && (
+                <Text style={styles.dimensionsSubtext}>
+                  Height: {product.fixedHeight} {getUnitSymbol()} (fixed)
+                </Text>
+              )}
+              {product.fixedHeight && item.customLength && (
+                <Text style={styles.dimensionsSubtext}>
+                  Area: {(product.fixedHeight * item.customLength).toFixed(2)} sq {getUnitSymbol()}
+                </Text>
+              )}
+            </View>
           </View>
+        )}
+
+        <View style={styles.footer}>
+          {/* For variable dimension products, quantity should typically be 1 */}
+          {product.isVariableDimension ? (
+            <View style={styles.quantityContainer}>
+              <View style={styles.quantityDisplay}>
+                <Text style={styles.quantity}>Qty: 1</Text>
+                <Text style={styles.quantityNote}>(Custom size)</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.quantityContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.quantityButton,
+                  quantity <= 0 && styles.quantityButtonDisabled,
+                ]}
+                onPress={() => onUpdateQuantity(product.id, quantity - 1)}
+                disabled={quantity <= 0}
+              >
+                <Ionicons
+                  name="remove"
+                  size={16}
+                  color={quantity <= 0 ? theme.colors.gray[400] : theme.colors.gray[700]}
+                />
+              </TouchableOpacity>
+              
+              <View style={styles.quantityDisplay}>
+                <Text style={styles.quantity}>{quantity}</Text>
+              </View>
+              
+              <TouchableOpacity
+                style={[
+                  styles.quantityButton,
+                  quantity >= product.stockQuantity && styles.quantityButtonDisabled,
+                ]}
+                onPress={() => onUpdateQuantity(product.id, quantity + 1)}
+                disabled={quantity >= product.stockQuantity}
+              >
+                <Ionicons
+                  name="add"
+                  size={16}
+                  color={quantity >= product.stockQuantity ? theme.colors.gray[400] : theme.colors.gray[700]}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.total}>${total.toFixed(2)}</Text>
+            <Text style={styles.total}>{formatPrice(total)}</Text>
           </View>
         </View>
 
@@ -116,33 +188,35 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius['2xl'],
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.lg,
-    ...theme.shadows.md,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
   },
   imageContainer: {
     position: 'relative',
-    marginRight: theme.spacing.lg,
+    marginRight: 16,
   },
   image: {
-    width: 90,
-    height: 90,
-    borderRadius: theme.borderRadius.xl,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: theme.colors.gray[100],
   },
   discountBadge: {
     position: 'absolute',
-    top: -theme.spacing.xs,
-    right: -theme.spacing.xs,
+    top: -8,
+    right: -8,
     backgroundColor: theme.colors.error[500],
-    paddingHorizontal: theme.spacing.xs,
+    borderRadius: 12,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.sm,
   },
   discountText: {
     color: theme.colors.text.inverse,
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: '700' as any,
+    fontSize: 10,
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -150,99 +224,125 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.md,
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   titleContainer: {
     flex: 1,
-    marginRight: theme.spacing.md,
+    marginRight: 8,
   },
   brand: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.primary[600],
-    fontWeight: '600' as any,
-    textTransform: 'uppercase',
-    letterSpacing: theme.typography.letterSpacing.wide,
-    marginBottom: theme.spacing.xs,
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    marginBottom: 2,
   },
   name: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600' as any,
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.colors.text.primary,
-    lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.base,
+    lineHeight: 20,
   },
   removeButton: {
-    backgroundColor: theme.colors.gray[100],
-    borderRadius: theme.borderRadius.full,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 4,
   },
   priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
+    marginBottom: 12,
+  },
+  variablePriceDisplay: {
+    flexDirection: 'column',
   },
   price: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '700' as any,
-    color: theme.colors.success[600],
-    marginRight: theme.spacing.sm,
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.primary[600],
+  },
+  priceNote: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    marginTop: 2,
+  },
+  rateInfo: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    marginTop: 4,
   },
   originalPrice: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.tertiary,
+    fontSize: 14,
+    color: theme.colors.gray[500],
     textDecorationLine: 'line-through',
-    fontWeight: '500' as any,
+    marginTop: 2,
+  },
+  dimensionsContainer: {
+    backgroundColor: theme.colors.primary[50],
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  dimensionsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dimensionsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primary[600],
+    marginLeft: 4,
+  },
+  dimensionsDetails: {
+    marginLeft: 16,
+  },
+  dimensionsSubtext: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    marginBottom: 2,
   },
   footer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.gray[100],
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.xs,
   },
   quantityButton: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.md,
     width: 32,
     height: 32,
-    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: theme.colors.gray[100],
     justifyContent: 'center',
-    ...theme.shadows.sm,
+    alignItems: 'center',
   },
   quantityButtonDisabled: {
-    backgroundColor: theme.colors.gray[200],
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: theme.colors.gray[50],
   },
   quantityDisplay: {
+    marginHorizontal: 16,
     minWidth: 40,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   quantity: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: '600' as any,
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.colors.text.primary,
+  },
+  quantityNote: {
+    fontSize: 10,
+    color: theme.colors.gray[500],
+    marginTop: 2,
   },
   totalContainer: {
     alignItems: 'flex-end',
   },
   totalLabel: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    fontWeight: '500' as any,
-    marginBottom: theme.spacing.xs,
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    marginBottom: 2,
   },
   total: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: '700' as any,
+    fontSize: 18,
+    fontWeight: '700',
     color: theme.colors.text.primary,
   },
   stockWarning: {
