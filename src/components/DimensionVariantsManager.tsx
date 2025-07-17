@@ -19,6 +19,8 @@ interface DimensionVariantsManagerProps {
   onAddSingleItem: (length: number, quantity: number) => Promise<void>;
   existingCartItems?: Array<{ length: number; quantity: number }>;
   onUpdateCartItem?: (length: number, newQuantity: number) => Promise<void>;
+  onRemoveVariant?: (length: number) => Promise<void>;
+  onRemoveAllVariants?: () => Promise<void>;
 }
 
 export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> = ({
@@ -26,6 +28,8 @@ export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> =
   onAddSingleItem,
   existingCartItems = [],
   onUpdateCartItem,
+  onRemoveVariant,
+  onRemoveAllVariants,
 }) => {
   const [currentLength, setCurrentLength] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -114,37 +118,19 @@ export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> =
 
   const handleUpdateQuantity = async (length: number, delta: number) => {
     try {
-      if (delta > 0) {
-        // Add more quantity by adding another item with same length
-        await onAddSingleItem(length, 1);
-        Alert.alert('Updated', `Added 1 more unit of ${length} ${getUnitSymbol()} length`);
-      } else if (delta < 0 && onUpdateCartItem) {
+      if (onUpdateCartItem) {
         // Find current quantity for this length
         const currentItem = existingCartItems.find(item => item.length === length);
         if (currentItem) {
-          const newQuantity = currentItem.quantity - 1;
-          
-          if (newQuantity <= 0) {
-            // Remove item completely
-            await onUpdateCartItem(length, 0);
-            Alert.alert('Removed', `Removed ${length} ${getUnitSymbol()} length from cart`);
-          } else {
-            // Decrease quantity by 1
-            await onUpdateCartItem(length, newQuantity);
-            Alert.alert('Updated', `Reduced ${length} ${getUnitSymbol()} length quantity to ${newQuantity}`);
-          }
+          const newQuantity = Math.max(0, currentItem.quantity + delta);
+          await onUpdateCartItem(length, newQuantity);
         }
-      } else {
-        // Fallback if onUpdateCartItem is not provided
-        Alert.alert(
-          'Remove Item', 
-          `To reduce or remove items with ${length} ${getUnitSymbol()} length, please use the cart page.`,
-          [{ text: 'OK' }]
-        );
+      } else if (delta > 0) {
+        // Fallback for increment only
+        await onAddSingleItem(length, 1);
       }
     } catch (error) {
       console.error('Failed to update quantity:', error);
-      Alert.alert('Error', 'Failed to update quantity. Please try again.');
     }
   };
 
@@ -205,6 +191,15 @@ export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> =
                 <Ionicons name="add" size={16} color={theme.colors.primary[600]} />
               </TouchableOpacity>
             </View>
+            {onRemoveVariant && (
+              <TouchableOpacity
+                style={styles.removeVariantButton}
+                onPress={() => onRemoveVariant(item.length)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="trash" size={16} color={theme.colors.error[600]} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -215,13 +210,7 @@ export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> =
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Ionicons name="resize-outline" size={20} color={theme.colors.primary[600]} />
-          <Text style={styles.title}>Custom Dimensions</Text>
-        </View>
-        <View style={styles.infoBadge}>
-          <Text style={styles.infoText}>Variable Size</Text>
-        </View>
+        <Text style={styles.title}>Select Length</Text>
       </View>
 
       {/* Product Dimension Info */}
@@ -339,6 +328,15 @@ export const DimensionVariantsManager: React.FC<DimensionVariantsManagerProps> =
         <View style={styles.cartItemsSection}>
           <View style={styles.cartItemsSectionHeader}>
             <Text style={styles.sectionTitle}>In Your Cart ({existingCartItems.length} sizes)</Text>
+            {onRemoveAllVariants && (
+              <TouchableOpacity 
+                style={styles.removeAllButton} 
+                onPress={onRemoveAllVariants}
+              >
+                <Ionicons name="trash" size={16} color={theme.colors.error[600]} />
+                <Text style={styles.removeAllButtonText}>Clear</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <FlatList
@@ -545,7 +543,26 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.gray[200],
   },
   cartItemsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: theme.spacing.md,
+  },
+  removeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.error[50],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.error[200],
+    gap: theme.spacing.xs,
+  },
+  removeAllButtonText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.error[600],
+    fontWeight: '600',
   },
   cartItemsList: {
     maxHeight: 200,
@@ -560,6 +577,22 @@ const styles = StyleSheet.create({
   },
   cartItemInfo: {
     flex: 1,
+  },
+  cartItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.sm,
+  },
+  removeVariantButton: {
+    backgroundColor: theme.colors.error[50],
+    borderRadius: theme.borderRadius.full,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.error[200],
   },
   cartItemMainInfo: {
     flexDirection: 'row',
@@ -592,6 +625,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   cartItemQuantitySection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   quantityControls: {

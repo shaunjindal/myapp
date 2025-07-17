@@ -112,6 +112,13 @@ public class CartMapper {
             dto.setTaxAmount(product.getTaxAmount());
             dto.setIsPriceChanged(entity.isPriceChanged());
             
+            // Set variable dimension product properties
+            dto.setIsVariableDimension(product.isVariableDimension());
+            dto.setFixedHeight(product.getFixedHeight());
+            dto.setDimensionUnit(product.getDimensionUnit() != null ? product.getDimensionUnit().toString() : null);
+            dto.setVariableDimensionRate(product.getVariableDimensionRate());
+            dto.setMaxLength(product.getMaxLength());
+            
             // Set unavailability reason if product is not available
             if (!product.isAvailable() || product.getStockQuantity() < entity.getQuantity()) {
                 dto.setIsAvailable(false);

@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface CartItemProps {
   item: CartItemType;
-  onUpdateQuantity: (productId: string, quantity: number) => void;
-  onRemove: (productId: string) => void;
+  onUpdateQuantity: (itemId: string, quantity: number) => void;
+  onRemove: (itemId: string) => void;
 }
 
 export const CartItem: React.FC<CartItemProps> = ({
@@ -18,14 +18,12 @@ export const CartItem: React.FC<CartItemProps> = ({
 }) => {
   const { product, quantity } = item;
   
-  // For variable dimension products, calculatedUnitPrice is the total price
-  const effectivePrice = item.calculatedUnitPrice && product.isVariableDimension ? 
+  // For variable dimension products, calculatedUnitPrice is the unit price per piece
+  const unitPrice = product.isVariableDimension && item.calculatedUnitPrice ? 
     item.calculatedUnitPrice : 
     (item.calculatedUnitPrice || product.price);
     
-  const total = item.calculatedUnitPrice && product.isVariableDimension ? 
-    item.calculatedUnitPrice :  // Don't multiply by quantity for variable dimensions
-    effectivePrice * quantity;
+  const total = unitPrice * quantity;
     
   const isDiscounted = product.originalPrice && product.originalPrice > product.price && !item.calculatedUnitPrice;
 
@@ -63,7 +61,7 @@ export const CartItem: React.FC<CartItemProps> = ({
           </View>
           <TouchableOpacity
             style={styles.removeButton}
-            onPress={() => onRemove(product.id)}
+            onPress={() => onRemove(item.id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="close" size={20} color={theme.colors.gray[500]} />
@@ -71,16 +69,9 @@ export const CartItem: React.FC<CartItemProps> = ({
         </View>
 
         <View style={styles.priceContainer}>
-          {product.isVariableDimension && item.calculatedUnitPrice ? (
-            <View style={styles.variablePriceDisplay}>
-              <Text style={styles.price}>{formatPrice(item.calculatedUnitPrice)}</Text>
-              <Text style={styles.priceNote}>Total for custom size</Text>
-            </View>
-          ) : (
-            <Text style={styles.price}>
-              {item.calculatedUnitPrice ? formatPrice(item.calculatedUnitPrice) : formatPrice(product.price)}
-            </Text>
-          )}
+          <Text style={styles.price}>
+            {formatPrice(unitPrice)} each
+          </Text>
           {isDiscounted && product.originalPrice && !item.calculatedUnitPrice && (
             <Text style={styles.originalPrice}>{formatPrice(product.originalPrice)}</Text>
           )}
@@ -91,28 +82,14 @@ export const CartItem: React.FC<CartItemProps> = ({
           )}
         </View>
 
-        {/* Enhanced Custom Dimensions Info */}
-        {item.customLength && product.isVariableDimension && (
+        {/* Variable Dimensions Display */}
+        {item.customLength && product.isVariableDimension && product.fixedHeight && (
           <View style={styles.dimensionsContainer}>
             <View style={styles.dimensionsBadge}>
-              <Ionicons name="resize-outline" size={12} color={theme.colors.primary[600]} />
-              <Text style={styles.dimensionsText}>Custom Dimensions</Text>
-            </View>
-            
-            <View style={styles.dimensionsDetails}>
-              <Text style={styles.dimensionsSubtext}>
-                Length: {item.customLength} {getUnitSymbol()}
+              <Ionicons name="resize-outline" size={14} color={theme.colors.primary[600]} />
+              <Text style={styles.dimensionsText}>
+                {item.customLength} × {product.fixedHeight} {getUnitSymbol()}
               </Text>
-              {product.fixedHeight && (
-                <Text style={styles.dimensionsSubtext}>
-                  Height: {product.fixedHeight} {getUnitSymbol()} (fixed)
-                </Text>
-              )}
-              {product.fixedHeight && item.customLength && (
-                <Text style={styles.dimensionsSubtext}>
-                  Area: {(product.fixedHeight * item.customLength).toFixed(2)} sq {getUnitSymbol()}
-                </Text>
-              )}
             </View>
           </View>
         )}
@@ -133,7 +110,7 @@ export const CartItem: React.FC<CartItemProps> = ({
                   styles.quantityButton,
                   quantity <= 0 && styles.quantityButtonDisabled,
                 ]}
-                onPress={() => onUpdateQuantity(product.id, quantity - 1)}
+                onPress={() => onUpdateQuantity(item.id, quantity - 1)}
                 disabled={quantity <= 0}
               >
                 <Ionicons
@@ -152,7 +129,7 @@ export const CartItem: React.FC<CartItemProps> = ({
                   styles.quantityButton,
                   quantity >= product.stockQuantity && styles.quantityButtonDisabled,
                 ]}
-                onPress={() => onUpdateQuantity(product.id, quantity + 1)}
+                onPress={() => onUpdateQuantity(item.id, quantity + 1)}
                 disabled={quantity >= product.stockQuantity}
               >
                 <Ionicons

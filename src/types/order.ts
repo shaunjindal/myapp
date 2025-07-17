@@ -99,7 +99,6 @@ export interface OrderItemDto {
   id: string;
   productId: string;
   productName: string;
-  productSku: string;
   productDescription?: string;
   productImageUrl?: string;
   productBrand?: string;
@@ -126,6 +125,14 @@ export interface OrderItemDto {
   hasDiscount?: boolean;
   hasTax?: boolean;
   displayName?: string;
+  // Variable dimension fields
+  isVariableDimension?: boolean;
+  customLength?: number;
+  calculatedUnitPrice?: number;
+  fixedHeight?: number;
+  dimensionUnit?: string;
+  variableDimensionRate?: number;
+  maxLength?: number;
 }
 
 export interface OrderStatusHistoryDto {

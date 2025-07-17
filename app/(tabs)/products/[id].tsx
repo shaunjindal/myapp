@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, FlatList, Dimensions, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,12 +9,10 @@ import { Button } from '../../../src/components/Button';
 import { theme } from '../../../src/styles/theme';
 import { StyleSheet } from 'react-native';
 import { productService } from '../../../src/services/productService';
-import { recommendationService } from '../../../src/services/recommendationService';
 import { cartService } from '../../../src/services/cartService';
 import { mapProductDtoToProduct, UpdateCartItemRequest } from '../../../src/types/api';
 import { Product } from '../../../src/types';
 import { RecommendationSection } from '../../../src/components/RecommendationSection';
-import { DimensionSelector } from '../../../src/components/DimensionSelector';
 import { DimensionVariantsManager } from '../../../src/components/DimensionVariantsManager';
 import { formatPrice } from '../../../src/utils/currencyUtils';
 
@@ -41,7 +39,6 @@ export default function ProductDetailScreen() {
   const carouselRef = useRef<FlatList>(null);
   const indicatorOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<NodeJS.Timeout | null>(null);
-  const resetHideTimerRef = useRef<() => void>();
   
   // All hooks must be called before any conditional returns
   const viewabilityConfig = useRef({
@@ -133,12 +130,22 @@ export default function ProductDetailScreen() {
     }
   }, [resetHideTimer]);
 
-  // Computed values (not hooks)
-  // For variable dimension products, check if any variant is in cart
-  // For regular products, check if product is in cart
+  // Computed values - simple and direct
   const cartItems = items.filter(item => item.product.id === product?.id);
   const isInCart = cartItems.length > 0;
   const currentQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  // Calculate total amount for variable dimension products
+  const totalAmount = useMemo(() => {
+    if (!product?.isVariableDimension) return 0;
+    
+    return cartItems.reduce((total, item) => {
+      if (item.customLength && product.variableDimensionRate && product.fixedHeight) {
+        const itemTotal = item.quantity * product.variableDimensionRate * product.fixedHeight * item.customLength;
+        return total + itemTotal;
+      }
+      return total;
+    }, 0);
+  }, [cartItems, product?.variableDimensionRate, product?.fixedHeight, cartUpdateTrigger]);
 
   if (loading) {
     return (
@@ -172,7 +179,6 @@ export default function ProductDetailScreen() {
       for (let i = 0; i < quantity; i++) {
         await addItem(product, 1, length);
       }
-      // Trigger cart update to refresh the dimension manager
       handleCartUpdate();
     } catch (error) {
       console.error('Failed to add item to cart:', error);
@@ -240,12 +246,26 @@ export default function ProductDetailScreen() {
       // Sync cart state with backend
       await syncCart();
       
-      // Trigger UI update
       handleCartUpdate();
       
     } catch (error) {
       console.error('Failed to update cart item:', error);
       throw error;
+    }
+  };
+
+  const handleRemoveVariant = async (length: number) => {
+    await handleUpdateCartItem(length, 0);
+  };
+
+  const handleRemoveAllVariants = async () => {
+    if (product?.isVariableDimension) {
+      // For variable dimension products, remove all variants
+      for (const item of cartItems) {
+        await cartService.removeCartItem(item.id);
+      }
+      await syncCart();
+      handleCartUpdate();
     }
   };
 
@@ -510,16 +530,7 @@ export default function ProductDetailScreen() {
                         {product.fixedHeight} × {customLength} = {((product.fixedHeight || 0) * (customLength || 0)).toFixed(2)} sq {getUnitSymbol(product.dimensionUnit)}
                       </Text>
                     </View>
-                  ) : (
-                    <View style={styles.originalPriceRow}>
-                      <Text style={styles.originalPrice}>
-                        Fixed Height: {product.fixedHeight} {getUnitSymbol(product.dimensionUnit)}
-                      </Text>
-                      <Text style={styles.savings}>
-                        Select length to calculate total
-                      </Text>
-                    </View>
-                  )
+                  ) : null
                 ) : (
                   product.originalPrice && (product.originalPrice - product.price) > 0 && (
                     <View style={styles.originalPriceRow}>
@@ -542,6 +553,8 @@ export default function ProductDetailScreen() {
                 onAddSingleItem={handleAddSingleItem}
                 existingCartItems={getExistingCartItems()}
                 onUpdateCartItem={handleUpdateCartItem}
+                onRemoveVariant={handleRemoveVariant}
+                onRemoveAllVariants={handleRemoveAllVariants}
               />
           )}
 
@@ -721,19 +734,9 @@ export default function ProductDetailScreen() {
             <Text style={styles.cartSummaryText}>
               {cartItems.length} dimension variant{cartItems.length > 1 ? 's' : ''} • Total quantity: {currentQuantity}
             </Text>
-            <View style={styles.cartSummaryActions}>
-              <TouchableOpacity 
-                style={styles.viewCartButton}
-                onPress={() => router.push('/(tabs)/cart')}
-              >
-                <Ionicons name="eye-outline" size={16} color={theme.colors.primary[600]} />
-                <Text style={styles.viewCartText}>View Cart</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.removeAllButton} onPress={handleRemove}>
-                <Ionicons name="trash" size={16} color={theme.colors.error[600]} />
-                <Text style={styles.removeAllText}>Remove All</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.cartSummaryAmount}>
+              Total Amount: {formatPrice(totalAmount)}
+            </Text>
           </View>
         </View>
       )}
@@ -1406,6 +1409,12 @@ const styles = StyleSheet.create({
   cartSummaryText: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.sm,
+  },
+  cartSummaryAmount: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.primary[600],
+    fontWeight: '600',
     marginBottom: theme.spacing.md,
   },
   cartSummaryActions: {

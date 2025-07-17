@@ -13,7 +13,6 @@ interface OrderItem {
   id: string;
   productName: string;
   productBrand?: string;
-  productSku: string;
   productImageUrl?: string;
   unitPrice: number;
   quantity: number;
@@ -22,6 +21,14 @@ interface OrderItem {
   baseAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
+  // Variable dimension fields
+  isVariableDimension?: boolean;
+  customLength?: number;
+  calculatedUnitPrice?: number;
+  fixedHeight?: number;
+  dimensionUnit?: string;
+  variableDimensionRate?: number;
+  maxLength?: number;
 }
 
 interface PaymentComponent {
@@ -95,46 +102,67 @@ export function OrderDetailsOrderSummary({
 
   const renderItems = () => (
     <View style={styles.orderItems}>
-      {items.map((item, index) => (
-        <View key={item.id} style={[
-          styles.orderItem,
-          index === items.length - 1 && styles.lastOrderItem
-        ]}>
-          <View style={styles.productImageContainer}>
-            <Image 
-              source={{ uri: item.productImageUrl || 'https://via.placeholder.com/60' }} 
-              style={styles.productImage} 
-            />
-            <View style={styles.quantityBadge}>
-              <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
-            </View>
-          </View>
-          <View style={styles.itemDetails}>
-            <Text style={styles.itemName} numberOfLines={2}>{item.productName}</Text>
-            {item.productBrand && (
-              <View style={styles.brandContainer}>
-                <Text style={styles.brandText}>{item.productBrand}</Text>
+      {items.map((item, index) => {
+        // For variable dimension products, use calculatedUnitPrice if available, otherwise use regular unitPrice
+        const displayUnitPrice = item.isVariableDimension && item.calculatedUnitPrice ? 
+          item.calculatedUnitPrice : 
+          item.unitPrice;
+        
+        const displayTotalPrice = item.isVariableDimension && item.calculatedUnitPrice ? 
+          (item.calculatedUnitPrice * item.quantity) : 
+          item.totalPrice;
+
+        return (
+          <View key={item.id} style={[
+            styles.orderItem,
+            index === items.length - 1 && styles.lastOrderItem
+          ]}>
+            <View style={styles.productImageContainer}>
+              <Image 
+                source={{ uri: item.productImageUrl || 'https://via.placeholder.com/60' }} 
+                style={styles.productImage} 
+              />
+              <View style={styles.quantityBadge}>
+                <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
               </View>
-            )}
-            <Text style={styles.itemSku}>SKU: {item.productSku}</Text>
-            <View style={styles.itemPriceRow}>
-              <View style={styles.priceBreakdown}>
-                {/* Show simplified pricing without tax/base breakdown */}
-                {item.discountAmount && item.discountAmount > 0 ? (
-                  <>
-                    <Text style={styles.basePrice}>Was: {formatPrice(item.unitPrice + item.discountAmount, currency)} each</Text>
-                    <Text style={styles.discountPrice}>
-                      Save: -{formatPrice(item.discountAmount, currency)} each
+            </View>
+            <View style={styles.itemDetails}>
+              <Text style={styles.itemName} numberOfLines={2}>{item.productName}</Text>
+              
+              {/* Variable Dimension Details - Between name and brand */}
+              {item.isVariableDimension && item.customLength && item.fixedHeight && (
+                <Text style={styles.dimensionInfo}>
+                  {item.customLength} × {item.fixedHeight} {item.dimensionUnit === 'MILLIMETER' ? 'mm' : item.dimensionUnit === 'CENTIMETER' ? 'cm' : item.dimensionUnit === 'METER' ? 'm' : item.dimensionUnit === 'INCH' ? 'in' : item.dimensionUnit === 'FOOT' ? 'ft' : item.dimensionUnit === 'YARD' ? 'yd' : 'units'} ({((item.customLength || 0) * (item.fixedHeight || 0)).toFixed(2)} sq {item.dimensionUnit === 'MILLIMETER' ? 'mm' : item.dimensionUnit === 'CENTIMETER' ? 'cm' : item.dimensionUnit === 'METER' ? 'm' : item.dimensionUnit === 'INCH' ? 'in' : item.dimensionUnit === 'FOOT' ? 'ft' : item.dimensionUnit === 'YARD' ? 'yd' : 'units'})
+                </Text>
+              )}
+              
+              {item.productBrand && (
+                <View style={styles.brandContainer}>
+                  <Text style={styles.brandText}>{item.productBrand}</Text>
+                </View>
+              )}
+              <View style={styles.itemPriceRow}>
+                <View style={styles.priceBreakdown}>
+                  {/* Show discount pricing for regular products only */}
+                  {!item.isVariableDimension && item.discountAmount && item.discountAmount > 0 ? (
+                    <>
+                      <Text style={styles.basePrice}>Was: {formatPrice(item.unitPrice + item.discountAmount, currency)} each</Text>
+                      <Text style={styles.discountPrice}>
+                        Save: -{formatPrice(item.discountAmount, currency)} each
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.unitPrice}>
+                      {formatPrice(displayUnitPrice, currency)} each (incl. tax)
                     </Text>
-                  </>
-                ) : null}
-                <Text style={styles.unitPrice}>{formatPrice(item.unitPrice, currency)} each (incl. tax)</Text>
+                  )}
+                </View>
+                <Text style={styles.itemTotal}>{formatPrice(displayTotalPrice, currency)}</Text>
               </View>
-              <Text style={styles.itemTotal}>{formatPrice(item.totalPrice, currency)}</Text>
             </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 
@@ -154,7 +182,7 @@ export function OrderDetailsOrderSummary({
             <Text style={styles.summaryValue}>{formatPrice(subtotal, currency)}</Text>
           </View>
           
-          {paymentComponents?.map((component, index) => (
+          {paymentComponents?.filter(component => component.type !== 'TAX').map((component, index) => (
             <View key={index} style={styles.summaryItem}>
               <View style={styles.summaryItemLeft}>
                 <Ionicons name={getComponentIcon(component.type)} size={16} color={getComponentColor(component.type, component.isNegative || false)} />
@@ -177,6 +205,12 @@ export function OrderDetailsOrderSummary({
               )}
             </View>
           ))}
+        </View>
+        
+        {/* Tax-inclusive information */}
+        <View style={styles.taxInclusiveNote}>
+          <Ionicons name="information-circle-outline" size={16} color={theme.colors.gray[500]} />
+          <Text style={styles.taxInclusiveText}>All prices include applicable taxes</Text>
         </View>
         
         <View style={styles.divider} />
@@ -300,11 +334,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
   },
-  itemSku: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.sm,
-  },
   itemPriceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -334,6 +363,27 @@ const styles = StyleSheet.create({
   },
   summaryContent: {
     gap: theme.spacing.xs,
+  },
+  taxInclusiveNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.md,
+    marginTop: theme.spacing.sm,
+  },
+  taxInclusiveText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.gray[600],
+    fontWeight: '500',
+    marginLeft: theme.spacing.xs,
+  },
+  dimensionInfo: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '400',
   },
   summaryItemsContainer: {
     gap: theme.spacing.md,

@@ -11,7 +11,6 @@ public class OrderItemDto {
     private String id;
     private String productId;
     private String productName;
-    private String productSku;
     private String productDescription;
     private String productImageUrl;
     private String productBrand;
@@ -30,6 +29,18 @@ public class OrderItemDto {
     private boolean isGift;
     private String giftMessage;
     private String customAttributes;
+    
+    // Variable dimension fields
+    private BigDecimal customLength;
+    private BigDecimal calculatedUnitPrice;
+    private String dimensionDetails;
+    
+    // Product variable dimension properties
+    private Boolean isVariableDimension;
+    private BigDecimal fixedHeight;
+    private String dimensionUnit;
+    private BigDecimal variableDimensionRate;
+    private BigDecimal maxLength;
 
     // Constructors
     public OrderItemDto() {
@@ -58,14 +69,6 @@ public class OrderItemDto {
 
     public void setProductName(String productName) {
         this.productName = productName;
-    }
-
-    public String getProductSku() {
-        return productSku;
-    }
-
-    public void setProductSku(String productSku) {
-        this.productSku = productSku;
     }
 
     public String getProductDescription() {
@@ -255,5 +258,71 @@ public class OrderItemDto {
 
     public void setTaxRate(BigDecimal taxRate) {
         this.taxRate = taxRate;
+    }
+
+    // Variable dimension getters and setters
+    public BigDecimal getCustomLength() {
+        return customLength;
+    }
+
+    public void setCustomLength(BigDecimal customLength) {
+        this.customLength = customLength;
+    }
+
+    public BigDecimal getCalculatedUnitPrice() {
+        return calculatedUnitPrice;
+    }
+
+    public void setCalculatedUnitPrice(BigDecimal calculatedUnitPrice) {
+        this.calculatedUnitPrice = calculatedUnitPrice;
+    }
+
+    public String getDimensionDetails() {
+        return dimensionDetails;
+    }
+
+    public void setDimensionDetails(String dimensionDetails) {
+        this.dimensionDetails = dimensionDetails;
+    }
+
+    // Product variable dimension properties getters and setters
+    public Boolean getIsVariableDimension() {
+        return isVariableDimension;
+    }
+
+    public void setIsVariableDimension(Boolean isVariableDimension) {
+        this.isVariableDimension = isVariableDimension;
+    }
+
+    public BigDecimal getFixedHeight() {
+        return fixedHeight;
+    }
+
+    public void setFixedHeight(BigDecimal fixedHeight) {
+        this.fixedHeight = fixedHeight;
+    }
+
+    public String getDimensionUnit() {
+        return dimensionUnit;
+    }
+
+    public void setDimensionUnit(String dimensionUnit) {
+        this.dimensionUnit = dimensionUnit;
+    }
+
+    public BigDecimal getVariableDimensionRate() {
+        return variableDimensionRate;
+    }
+
+    public void setVariableDimensionRate(BigDecimal variableDimensionRate) {
+        this.variableDimensionRate = variableDimensionRate;
+    }
+
+    public BigDecimal getMaxLength() {
+        return maxLength;
+    }
+
+    public void setMaxLength(BigDecimal maxLength) {
+        this.maxLength = maxLength;
     }
 } 

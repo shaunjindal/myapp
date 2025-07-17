@@ -38,7 +38,7 @@ const calculateTotals = (items: CartItem[], backendCart?: any) => {
     
     // For variable dimension products, calculatedUnitPrice is already the total price including tax
     if (item.calculatedUnitPrice && product.isVariableDimension) {
-      return sum + item.calculatedUnitPrice;
+      return sum + (item.calculatedUnitPrice * item.quantity);
     }
     
     // For variable dimension products without calculatedUnitPrice (fallback)
@@ -171,6 +171,12 @@ const convertApiCartToFrontend = (apiCart: any) => {
       baseAmount: item.baseAmount,
       taxRate: item.taxRate,
       taxAmount: item.taxAmount,
+      // Variable dimension properties from backend
+      isVariableDimension: item.isVariableDimension,
+      fixedHeight: item.fixedHeight,
+      dimensionUnit: item.dimensionUnit,
+      variableDimensionRate: item.variableDimensionRate,
+      maxLength: item.maxLength,
     },
     quantity: item.quantity || 0,
     // Variable dimension fields from backend
@@ -229,12 +235,14 @@ export interface CartStoreState extends CartState {
   // Enhanced cart methods with session awareness
   addItemWithSession: (product: Product, quantity?: number, customLength?: number) => Promise<void>;
   updateQuantityWithSession: (productId: string, quantity: number) => Promise<void>;
-  removeItemWithSession: (productId: string) => Promise<void>;
+  updateQuantityWithSessionById: (itemId: string, quantity: number) => Promise<void>;
+  removeItemWithSession: (itemId: string) => Promise<void>;
+  removeItemByProductId: (productId: string) => Promise<void>;
   clearCartWithSession: () => Promise<void>;
   
   // Legacy methods for backward compatibility
   addItem: (product: Product, quantity?: number, customLength?: number) => Promise<void>;
-  removeItem: (productId: string) => Promise<void>;
+  removeItem: (itemIdOrProductId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
 }
@@ -485,13 +493,36 @@ export const useCartStore = create<CartStoreState>()(
         }
       },
       
-      // Enhanced update quantity with session awareness
-      updateQuantityWithSession: async (productId: string, quantity: number) => {
+      // Enhanced update quantity with session awareness - using item ID
+      updateQuantityWithSessionById: async (itemId: string, quantity: number) => {
         if (quantity <= 0) {
-          await get().removeItemWithSession(productId);
+          await get().removeItemWithSession(itemId);
           return;
         }
         
+        try {
+          // Use the item ID directly
+          const apiCart = await cartService.updateCartItem(itemId, { quantity });
+          const { items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
+          
+          set({ items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency, lastSyncAt: new Date() });
+          await sessionManager.updateCartActivity(updatedItems.length);
+        } catch (error) {
+          console.error('Failed to update item quantity:', error);
+          // Fallback to local state
+          const { items } = get();
+          const updatedItems = items.map(item =>
+            item.id === itemId
+              ? { ...item, quantity }
+              : item
+          );
+          const totals = calculateTotals(updatedItems);
+          set({ items: updatedItems, ...totals });
+        }
+      },
+
+      // Enhanced update quantity with session awareness - using product ID (legacy)
+      updateQuantityWithSession: async (productId: string, quantity: number) => {
         try {
           // Find the item in the current cart state to get its ID
           const { items } = get();
@@ -501,12 +532,8 @@ export const useCartStore = create<CartStoreState>()(
             throw new Error('Product not found in cart');
           }
           
-          // Use the item ID directly to avoid unnecessary GET call
-          const apiCart = await cartService.updateCartItem(item.id, { quantity });
-          const { items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
-          
-          set({ items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency, lastSyncAt: new Date() });
-          await sessionManager.updateCartActivity(updatedItems.length);
+          // Use the new itemId-based method
+          await get().updateQuantityWithSessionById(item.id, quantity);
         } catch (error) {
           console.error('Failed to update item quantity:', error);
           // Fallback to local state
@@ -522,18 +549,10 @@ export const useCartStore = create<CartStoreState>()(
       },
       
       // Enhanced remove item with session awareness
-      removeItemWithSession: async (productId: string) => {
+      removeItemWithSession: async (itemId: string) => {
         try {
-          // Find the item in the current cart state to get its ID
-          const { items } = get();
-          const item = items.find(item => item.product.id === productId);
-          
-          if (!item) {
-            throw new Error('Product not found in cart');
-          }
-          
-          // Use the item ID directly to avoid unnecessary GET call
-          const apiCart = await cartService.removeFromCart(item.id);
+          // Use the item ID directly
+          const apiCart = await cartService.removeFromCart(itemId);
           const { items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency } = convertApiCartToFrontend(apiCart);
           
           set({ items: updatedItems, total, subtotal, tax, shipping, discount, fees, finalTotal, paymentComponents, currency, lastSyncAt: new Date() });
@@ -542,7 +561,7 @@ export const useCartStore = create<CartStoreState>()(
           console.error('Failed to remove item from cart:', error);
           // Fallback to local state
           const { items } = get();
-          const updatedItems = items.filter(item => item.product.id !== productId);
+          const updatedItems = items.filter(item => item.id !== itemId);
           const totals = calculateTotals(updatedItems);
           set({ items: updatedItems, ...totals });
         }
@@ -564,13 +583,46 @@ export const useCartStore = create<CartStoreState>()(
         }
       },
       
+      // Product-based remove method for backward compatibility
+      removeItemByProductId: async (productId: string) => {
+        try {
+          // Find the item in the current cart state to get its ID
+          const { items } = get();
+          const item = items.find(item => item.product.id === productId);
+          
+          if (!item) {
+            throw new Error('Product not found in cart');
+          }
+          
+          // Use the itemId-based method
+          await get().removeItemWithSession(item.id);
+        } catch (error) {
+          console.error('Failed to remove item by product ID:', error);
+          // Fallback to local state
+          const { items } = get();
+          const updatedItems = items.filter(item => item.product.id !== productId);
+          const totals = calculateTotals(updatedItems);
+          set({ items: updatedItems, ...totals });
+        }
+      },
+
       // Legacy methods for backward compatibility
       addItem: async (product: Product, quantity: number = 1, customLength?: number) => {
         await get().addItemWithSession(product, quantity, customLength);
       },
       
-      removeItem: async (productId: string) => {
-        await get().removeItemWithSession(productId);
+      removeItem: async (itemIdOrProductId: string) => {
+        // Try to find by item ID first, then fall back to product ID
+        const { items } = get();
+        const itemById = items.find(item => item.id === itemIdOrProductId);
+        
+        if (itemById) {
+          // It's an item ID
+          await get().removeItemWithSession(itemIdOrProductId);
+        } else {
+          // It's a product ID (legacy)
+          await get().removeItemByProductId(itemIdOrProductId);
+        }
       },
       
       updateQuantity: async (productId: string, quantity: number) => {

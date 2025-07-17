@@ -181,6 +181,12 @@ export interface CartItemDto {
   customLength?: number;
   calculatedUnitPrice?: number;
   dimensionDetails?: string;
+  // Product variable dimension properties
+  isVariableDimension?: boolean;
+  fixedHeight?: number;
+  dimensionUnit?: string;
+  variableDimensionRate?: number;
+  maxLength?: number;
   addedAt: string;
   updatedAt?: string;
 }

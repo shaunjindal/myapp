@@ -161,6 +161,14 @@ export default function CartScreen() {
                   <View style={styles.itemHeader}>
                     <View style={styles.itemTitleContainer}>
                       <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
+                      
+                      {/* Variable Dimension Details - Between name and brand */}
+                      {item.product.isVariableDimension && item.customLength && item.product.fixedHeight && (
+                        <Text style={styles.dimensionInfo}>
+                          {item.customLength} × {item.product.fixedHeight} {item.product.dimensionUnit === 'MILLIMETER' ? 'mm' : item.product.dimensionUnit === 'CENTIMETER' ? 'cm' : item.product.dimensionUnit === 'METER' ? 'm' : item.product.dimensionUnit === 'INCH' ? 'in' : item.product.dimensionUnit === 'FOOT' ? 'ft' : item.product.dimensionUnit === 'YARD' ? 'yd' : 'units'} ({((item.customLength || 0) * (item.product.fixedHeight || 0)).toFixed(2)} sq {item.product.dimensionUnit === 'MILLIMETER' ? 'mm' : item.product.dimensionUnit === 'CENTIMETER' ? 'cm' : item.product.dimensionUnit === 'METER' ? 'm' : item.product.dimensionUnit === 'INCH' ? 'in' : item.product.dimensionUnit === 'FOOT' ? 'ft' : item.product.dimensionUnit === 'YARD' ? 'yd' : 'units'})
+                        </Text>
+                      )}
+                      
                       {item.product.brand && (
                         <View style={styles.brandContainer}>
                           <Text style={styles.brandText}>{item.product.brand}</Text>
@@ -169,7 +177,7 @@ export default function CartScreen() {
                     </View>
                     <TouchableOpacity
                       style={styles.removeButton}
-                      onPress={() => removeItem(item.product.id)}
+                      onPress={() => removeItem(item.id)}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Ionicons name="close" size={18} color={theme.colors.gray[500]} />
@@ -183,10 +191,11 @@ export default function CartScreen() {
                         onPress={() => {
                           if (item.quantity === 1) {
                             // Remove item when quantity would go to 0
-                            removeItem(item.product.id);
+                            removeItem(item.id);
                           } else {
-                            // Decrement quantity
-                            updateQuantity(item.product.id, item.quantity - 1);
+                            // Decrement quantity using the new method that accepts item ID
+                            const { updateQuantityWithSessionById } = useCartStore.getState();
+                            updateQuantityWithSessionById(item.id, item.quantity - 1);
                           }
                         }}
                       >
@@ -204,7 +213,11 @@ export default function CartScreen() {
                           styles.quantityButton,
                           item.quantity >= item.product.stockQuantity && styles.quantityButtonDisabled,
                         ]}
-                        onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onPress={() => {
+                          // Increment quantity using the new method that accepts item ID
+                          const { updateQuantityWithSessionById } = useCartStore.getState();
+                          updateQuantityWithSessionById(item.id, item.quantity + 1);
+                        }}
                         disabled={item.quantity >= item.product.stockQuantity}
                       >
                         <Ionicons
@@ -216,21 +229,22 @@ export default function CartScreen() {
                     </View>
                     
                     <View style={styles.itemPriceContainer}>
-                      {item.product.isVariableDimension && item.calculatedUnitPrice ? (
-                        <>
-                          <Text style={styles.unitPrice}>
-                            Custom: {item.customLength} × {item.product.fixedHeight} = {((item.customLength || 0) * (item.product.fixedHeight || 0)).toFixed(2)} sq units
-                          </Text>
-                          <Text style={styles.itemTotal}>{formatPrice(item.calculatedUnitPrice)}</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each</Text>
-                          <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
-                        </>
-                      )}
+                      <Text style={styles.unitPrice}>
+                        {item.product.isVariableDimension && item.calculatedUnitPrice 
+                          ? formatPrice(item.calculatedUnitPrice) 
+                          : formatPrice(item.product.price)
+                        } each
+                      </Text>
+                      <Text style={styles.itemTotal}>
+                        {item.product.isVariableDimension && item.calculatedUnitPrice 
+                          ? formatPrice(item.calculatedUnitPrice * item.quantity)
+                          : formatPrice(item.product.price * item.quantity)
+                        }
+                      </Text>
                     </View>
                   </View>
+                  
+
                 </View>
               </View>
             ))}
@@ -600,6 +614,91 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.base,
     fontWeight: '600',
     color: theme.colors.text.primary,
+  },
+  // Variable Dimension Styles
+  variableDimensionSection: {
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
+  },
+  dimensionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[200],
+  },
+  dimensionHeaderText: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: '600',
+    color: theme.colors.primary[600],
+    marginLeft: theme.spacing.sm,
+  },
+  dimensionDetails: {
+    gap: theme.spacing.sm,
+  },
+  dimensionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dimensionLabel: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  dimensionValue: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.primary,
+    fontWeight: '600',
+  },
+  priceBreakdownSection: {
+    marginTop: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+    gap: theme.spacing.sm,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceLabel: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  priceValue: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.primary,
+    fontWeight: '600',
+  },
+  totalPriceRow: {
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[300],
+  },
+  totalPriceLabel: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.primary,
+    fontWeight: '700',
+  },
+  totalPriceValue: {
+    fontSize: theme.typography.sizes.lg,
+    color: theme.colors.primary[600],
+    fontWeight: '700',
+  },
+  dimensionInfo: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '400',
+    marginTop: theme.spacing.xs,
   },
   // No longer needed - styles moved to OrderSummary component
 }); 

@@ -41,6 +41,13 @@ public class CartItemDto {
     private BigDecimal calculatedUnitPrice;
     private String dimensionDetails;
     
+    // Product variable dimension properties
+    private Boolean isVariableDimension;
+    private BigDecimal fixedHeight;
+    private String dimensionUnit;
+    private BigDecimal variableDimensionRate;
+    private BigDecimal maxLength;
+    
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime addedAt;
     
@@ -288,6 +295,47 @@ public class CartItemDto {
     
     public void setDimensionDetails(String dimensionDetails) {
         this.dimensionDetails = dimensionDetails;
+    }
+    
+    // Product variable dimension property getters and setters
+    public Boolean getIsVariableDimension() {
+        return isVariableDimension;
+    }
+    
+    public void setIsVariableDimension(Boolean isVariableDimension) {
+        this.isVariableDimension = isVariableDimension;
+    }
+    
+    public BigDecimal getFixedHeight() {
+        return fixedHeight;
+    }
+    
+    public void setFixedHeight(BigDecimal fixedHeight) {
+        this.fixedHeight = fixedHeight;
+    }
+    
+    public String getDimensionUnit() {
+        return dimensionUnit;
+    }
+    
+    public void setDimensionUnit(String dimensionUnit) {
+        this.dimensionUnit = dimensionUnit;
+    }
+    
+    public BigDecimal getVariableDimensionRate() {
+        return variableDimensionRate;
+    }
+    
+    public void setVariableDimensionRate(BigDecimal variableDimensionRate) {
+        this.variableDimensionRate = variableDimensionRate;
+    }
+    
+    public BigDecimal getMaxLength() {
+        return maxLength;
+    }
+    
+    public void setMaxLength(BigDecimal maxLength) {
+        this.maxLength = maxLength;
     }
     
     // Helper methods for variable dimensions

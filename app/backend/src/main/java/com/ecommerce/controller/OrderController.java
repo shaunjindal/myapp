@@ -11,6 +11,7 @@ import com.ecommerce.domain.order.PaymentMethod;
 import com.ecommerce.infrastructure.persistence.entity.OrderJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.OrderItemJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.OrderStatusHistoryJpaEntity;
+import com.ecommerce.infrastructure.persistence.entity.ProductJpaEntity;
 import com.ecommerce.infrastructure.persistence.entity.UserJpaEntity;
 import com.ecommerce.infrastructure.persistence.repository.UserJpaRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -495,7 +496,6 @@ public class OrderController {
         dto.setId(item.getId());
         dto.setProductId(item.getProduct().getId());
         dto.setProductName(item.getProductName());
-        dto.setProductSku(item.getProductSku());
         dto.setProductDescription(item.getProductDescription());
         dto.setProductImageUrl(item.getProductImageUrl());
         dto.setProductBrand(item.getProductBrand());
@@ -514,6 +514,22 @@ public class OrderController {
         dto.setGift(item.isGift());
         dto.setGiftMessage(item.getGiftMessage());
         dto.setCustomAttributes(item.getCustomAttributes());
+        
+        // Variable dimension fields
+        dto.setCustomLength(item.getCustomLength());
+        dto.setCalculatedUnitPrice(item.getCalculatedUnitPrice());
+        dto.setDimensionDetails(item.getDimensionDetails());
+        
+        // Product variable dimension properties
+        ProductJpaEntity product = item.getProduct();
+        if (product != null) {
+            dto.setIsVariableDimension(product.isVariableDimension());
+            dto.setFixedHeight(product.getFixedHeight());
+            dto.setDimensionUnit(product.getDimensionUnit() != null ? product.getDimensionUnit().name() : null);
+            dto.setVariableDimensionRate(product.getVariableDimensionRate());
+            dto.setMaxLength(product.getMaxLength());
+        }
+        
         return dto;
     }
 

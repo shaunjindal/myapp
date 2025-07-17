@@ -119,13 +119,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Ionicons name="resize-outline" size={20} color={theme.colors.primary[600]} />
-          <Text style={styles.title}>Custom Dimensions</Text>
-        </View>
-        <View style={styles.infoBadge}>
-          <Text style={styles.infoText}>Variable Size</Text>
-        </View>
+        <Text style={styles.title}>Select Length</Text>
       </View>
 
       <View style={styles.dimensionInfo}>

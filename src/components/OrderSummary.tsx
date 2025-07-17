@@ -10,24 +10,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import { formatPrice } from '../utils/currencyUtils';
 import { useCartStore } from '../store/cartStore';
-
-interface OrderSummaryItem {
-  id: string;
-  quantity: number;
-  product: {
-    id: string;
-    name: string;
-    price: number;
-    image: string;
-    brand?: string;
-    baseAmount?: number;
-    taxAmount?: number;
-    originalPrice?: number; // Added for discount tracking
-  };
-}
+import { CartItem } from '../types';
 
 interface OrderSummaryProps {
-  items: OrderSummaryItem[];
+  items: CartItem[];
   showItems?: boolean;
   collapsible?: boolean;
   isExpanded?: boolean;
@@ -90,67 +76,67 @@ export function OrderSummary({
     <>
       {showItems && (
         <View style={styles.orderItems}>
-          {items.map((item, index) => (
-            <View key={item.id} style={[
-              styles.orderItem,
-              index === items.length - 1 && styles.lastOrderItem
-            ]}>
-              <View style={styles.productImageContainer}>
-                <Image source={{ uri: item.product.image }} style={styles.productImage} />
-                <View style={styles.quantityBadge}>
-                  <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
-                </View>
-              </View>
-              <View style={styles.itemDetails}>
-                <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
-                {item.product.brand && (
-                  <View style={styles.brandContainer}>
-                    <Text style={styles.brandText}>{item.product.brand}</Text>
+          {items.map((item, index) => {
+            const product = item.product;
+            
+            // For variable dimension products, use calculatedUnitPrice, otherwise use regular price
+            const unitPrice = product.isVariableDimension && item.calculatedUnitPrice ? 
+              item.calculatedUnitPrice : 
+              product.price;
+            
+            const totalItemPrice = unitPrice * item.quantity;
+            
+            return (
+              <View key={item.id} style={[
+                styles.orderItem,
+                index === items.length - 1 && styles.lastOrderItem
+              ]}>
+                <View style={styles.productImageContainer}>
+                  <Image source={{ uri: product.image }} style={styles.productImage} />
+                  <View style={styles.quantityBadge}>
+                    <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
                   </View>
-                )}
-                <View style={styles.itemPriceRow}>
-                  {item.product.baseAmount && item.product.taxAmount ? (
-                    <View style={styles.priceBreakdown}>
-                      {/* Show simplified price breakdown without separate tax */}
-                      {(() => {
-                        const hasDiscount = item.product.originalPrice && item.product.originalPrice > item.product.price;
-                        const discountAmount = hasDiscount ? (item.product.originalPrice! - item.product.price) : 0;
-                        
-                        return (
-                          <>
-                            {hasDiscount && discountAmount > 0 && (
-                              <>
-                                <Text style={styles.basePrice}>Was: {formatPrice(item.product.originalPrice!)} each</Text>
-                                <Text style={styles.discountPrice}>
-                                  Save: -{formatPrice(discountAmount)} each
-                                </Text>
-                              </>
-                            )}
-                            <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each (incl. tax)</Text>
-                          </>
-                        );
-                      })()}
+                </View>
+                <View style={styles.itemDetails}>
+                  <Text style={styles.itemName} numberOfLines={2}>{product.name}</Text>
+                  
+                  {/* Variable Dimension Details - Between name and brand */}
+                  {product.isVariableDimension && item.customLength && product.fixedHeight && (
+                    <Text style={styles.dimensionInfo}>
+                      {item.customLength} × {product.fixedHeight} {product.dimensionUnit === 'MILLIMETER' ? 'mm' : product.dimensionUnit === 'CENTIMETER' ? 'cm' : product.dimensionUnit === 'METER' ? 'm' : product.dimensionUnit === 'INCH' ? 'in' : product.dimensionUnit === 'FOOT' ? 'ft' : product.dimensionUnit === 'YARD' ? 'yd' : 'units'} ({((item.customLength || 0) * (product.fixedHeight || 0)).toFixed(2)} sq {product.dimensionUnit === 'MILLIMETER' ? 'mm' : product.dimensionUnit === 'CENTIMETER' ? 'cm' : product.dimensionUnit === 'METER' ? 'm' : product.dimensionUnit === 'INCH' ? 'in' : product.dimensionUnit === 'FOOT' ? 'ft' : product.dimensionUnit === 'YARD' ? 'yd' : 'units'})
+                    </Text>
+                  )}
+                  
+                  {product.brand && (
+                    <View style={styles.brandContainer}>
+                      <Text style={styles.brandText}>{product.brand}</Text>
                     </View>
-                  ) : (
+                  )}
+                  <View style={styles.itemPriceRow}>
                     <View style={styles.priceBreakdown}>
-                      {/* Fallback for items without detailed breakdown */}
-                      {item.product.originalPrice && item.product.originalPrice > item.product.price ? (
+                      {/* Show discount pricing for regular products only */}
+                      {!product.isVariableDimension && product.originalPrice && product.originalPrice > product.price ? (
                         <>
-                          <Text style={styles.basePrice}>Was: {formatPrice(item.product.originalPrice)} each</Text>
+                          <Text style={styles.basePrice}>Was: {formatPrice(product.originalPrice)} each</Text>
                           <Text style={styles.discountPrice}>
-                            Save: -{formatPrice(item.product.originalPrice - item.product.price)} each
+                            Save: -{formatPrice(product.originalPrice - product.price)} each
                           </Text>
                         </>
                       ) : (
-                        <Text style={styles.unitPrice}>{formatPrice(item.product.price)} each (incl. tax)</Text>
+                        <Text style={styles.unitPrice}>
+                          {product.isVariableDimension && item.calculatedUnitPrice 
+                            ? formatPrice(item.calculatedUnitPrice) 
+                            : formatPrice(product.price)
+                          } each
+                        </Text>
                       )}
                     </View>
-                  )}
-                  <Text style={styles.itemTotal}>{formatPrice(item.product.price * item.quantity)}</Text>
+                    <Text style={styles.itemTotal}>{formatPrice(totalItemPrice)}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
       
@@ -359,7 +345,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text.primary,
     lineHeight: theme.typography.lineHeights.tight * theme.typography.sizes.base,
-    marginBottom: theme.spacing.sm,
   },
   itemPriceRow: {
     flexDirection: 'row',
@@ -508,5 +493,11 @@ const styles = StyleSheet.create({
     color: theme.colors.gray[600],
     fontWeight: '500',
     fontStyle: 'italic',
+  },
+  dimensionInfo: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '400',
+    marginTop: theme.spacing.xs,
   },
 }); 
